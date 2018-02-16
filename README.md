@@ -47,7 +47,7 @@ Music Store
 
 #### Install Kafka Development Environment and web interface at http://127.0.1.1:3030
 
-    docker run -d --name KAFKA-http4s_slick_kafka_elastic -p 2181:2181 -p 3030:3030 -p 8081:8081 -p 8082:8082 -p 8083:8083 -p 9092:9092 -e ADV_HOST=192.168.99.100 landoop/fast-data-dev
+    docker run -d --name KAFKA-http4s_slick_kafka_elastic -p 2181:2181 -p 3030:3030 -p 8081:8081 -p 8082:8082 -p 8083:8083 -p 9092:9092 -e ADV_HOST=127.0.0.1 landoop/fast-data-dev
 
 ## Run integration test
 
