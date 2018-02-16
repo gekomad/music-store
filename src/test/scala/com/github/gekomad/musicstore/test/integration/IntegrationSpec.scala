@@ -93,7 +93,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
         case Created(_) =>
           Task.now(true)
         case e =>
-          log.error(s"sendJsonNoContent $insertUrl $workaround $e")
+          log.error(s"sendJsonNoContent $insertUrl $workaround", e)
           Task.now(false)
       }
       assert(o1.unsafeRun(), "insert artist")
@@ -114,7 +114,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
         case Created(_) =>
           Task.now(true)
         case e =>
-          log.error(s"sendJsonNoContent $insertUrl $workaround $e")
+          log.error(s"sendJsonNoContent $insertUrl $workaround", e)
           Task.now(false)
       }
       assert(o1.unsafeRun(), "insert album")
@@ -170,7 +170,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
         case Created(_) =>
           Task.now(true)
         case e =>
-          log.error(s"sendJsonNoContent $insertUrl $workaround $e")
+          log.error(s"sendJsonNoContent $insertUrl $workaround", e)
           Task.now(false)
       }
       assert(o1.unsafeRun())
@@ -191,7 +191,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
         case BadRequest(_) =>
           Task.now(true)
         case e =>
-          log.error(s"sendJsonNoContent $insertUrl $workaround $e")
+          log.error(s"sendJsonNoContent $insertUrl $workaround", e)
           Task.now(false)
       }
       assert(o1.unsafeRun(), "read album must returns 404")
@@ -215,7 +215,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
         case BadRequest(_) =>
           Task.now(true)
         case e =>
-          log.error(s"sendJsonNoContent $insertUrl $workaround $e")
+          log.error(s"sendJsonNoContent $insertUrl $workaround", e)
           Task.now(false)
       }
       assert(o1.unsafeRun(), "insert wrong name returns BadRequest")

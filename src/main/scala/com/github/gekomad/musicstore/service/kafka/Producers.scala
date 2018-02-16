@@ -32,6 +32,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import io.circe.syntax._
 import java.time.LocalDate
 
+import com.github.gekomad.musicstore.utility.Properties.Kafka
 import io.circe.Decoder.Result
 import io.circe.parser.parse
 import io.circe.generic.auto._
@@ -68,22 +69,21 @@ object Producers {
 
   object KafkaProducer1 {
 
-    abstract class KafkaProducerConf1 extends KafkaProducerConf {
+    abstract class KafkaProducerConf1 extends KafkaProducerConf
+
+    def apply(kafka: Kafka) = new KafkaProducerConf1 {
 
       val conf: KafkaProducer.Conf[String, Array[Byte]] = KafkaProducer.Conf(
 
         ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
-          ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> Properties.kafka.bootstrapServers))),
+          ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers))),
         keySerializer = new StringSerializer,
         valueSerializer = new org.apache.kafka.common.serialization.ByteArraySerializer
       )
 
-      val topic = List(com.github.gekomad.musicstore.utility.Properties.kafka.artistTopic._1)
-    }
-
-    def apply() = new KafkaProducerConf1 {
       val kafkaProducer = KafkaProducer(conf)
 
+      val (topic, _) = kafka.artistTopic.unzip
 
       def producer(kafkaProducer: KafkaProducer[String, Array[Byte]], article: AvroProduct, topics: List[String]): Future[List[RecordMetadata]] = {
         val serializedArticle = serializeAvro(article)
@@ -104,19 +104,20 @@ object Producers {
 
   object KafkaProducerDlq {
 
-    abstract class KafkaProducerConfDlq extends KafkaProducerConf {
+    abstract class KafkaProducerConfDlq extends KafkaProducerConf
+
+    def apply(kafka: Kafka) = new KafkaProducerConfDlq {
+
       val conf: KafkaProducer.Conf[String, Array[Byte]] = KafkaProducer.Conf(
         ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
-          ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> Properties.kafka.bootstrapServers))),
+          ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers))),
         keySerializer = new StringSerializer,
         valueSerializer = new org.apache.kafka.common.serialization.ByteArraySerializer
       )
 
-      val topic = List(com.github.gekomad.musicstore.utility.Properties.kafka.dlqTopic._1)
-    }
-
-    def apply() = new KafkaProducerConfDlq {
       val kafkaProducer = KafkaProducer(conf)
+
+      val topic = List(kafka.dlqTopic._1)
 
       def producer(kafkaProducer: KafkaProducer[String, Array[Byte]], article: AvroProduct, topics: List[String]) = {
         val serializedArticle = serializeAvro(article)

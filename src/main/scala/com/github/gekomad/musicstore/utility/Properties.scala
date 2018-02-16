@@ -17,6 +17,8 @@
 
 package com.github.gekomad.musicstore.utility
 
+import scala.collection.JavaConverters._
+
 import com.github.gekomad.musicstore.utility.Net._
 import com.typesafe.config.{Config, ConfigFactory}
 import org.http4s.Uri
@@ -26,32 +28,48 @@ import slick.jdbc.JdbcProfile
 
 import scala.language.postfixOps
 import scala.util.Properties.envOrNone
+import scala.util.{Success, Try}
 
 object Properties {
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  final case class Kafka(disabled: Boolean, artistTopic: (String, Int), dlqTopic: (String, Int), groupId: String, bootstrapServers: String) {
-    private val p = bootstrapServers.split(":")
-    private val host = p(0)
-    private val port = p(1).toInt
+  def getStringOrElse(s: => String, d: String) = Try(s).getOrElse(d)
 
-    def check = if (!disabled && !serverListening(host, port)) {
+  final case class Kafka(artistTopic: List[(String, Int)], dlqTopic: (String, Int), groupId: String, bootstrapServers: String, zookeeperServer: String) {
+    private val p = bootstrapServers.split(":")
+    private val hostk = p(0)
+    private val portk = p(1).toInt
+
+    private val z = zookeeperServer.split(":")
+    private val hostz = z(0)
+    private val portz = z(1).toInt
+
+    def check = if (!serverListening(hostk, portk)) {
       log.error("KAFKA NOT RESPONDING")
-      false
-    } else true
+      1
+    } else if (!serverListening(hostz, portz)) {
+      log.error("ZOOKEEPER NOT RESPONDING")
+      2
+    } else 0
+
   }
 
   object Kafka {
-    def apply(disabled: Boolean, artistTopic: String, dlqTopic: String, groupId: String, host: String) = {
-      val uri = Uri.fromString(if (host.contains("://")) host else s"http://$host")
-      require(uri.isRight)
-      val u: Uri = uri.getOrElse(throw new Exception)
-      u.port.getOrElse(throw new Exception)
-      val p = artistTopic.split(":")
+
+    def apply(artistTopic: List[String], dlqTopic: String, groupId: String, host: String, zookeeperServer: String) = {
+      Uri.fromString(if (host.contains("://")) host else s"http://$host").getOrElse(throw new Exception).port.getOrElse(throw new Exception)
+      Uri.fromString(if (zookeeperServer.contains("://")) zookeeperServer else s"http://$zookeeperServer").getOrElse(throw new Exception).port.getOrElse(throw new Exception)
+
+      val p = artistTopic.map(_.split(":"))
+
+      require(p.foldLeft(true)((a, b) => a && b.length == 2))
+
       val d = dlqTopic.split(":")
-      require(p.size == 2)
       require(d.size == 2)
-      val o = new Kafka(disabled, (p(0), p(1).toInt), (d(0), d(1).toInt), groupId, host)
+
+      val topicList = p.map(a => (a(0), a(1).toInt))
+
+      val o = new Kafka(topicList, (d(0), d(1).toInt), groupId, host, zookeeperServer)
       o.check
       o
     }
@@ -85,10 +103,17 @@ object Properties {
   val httpPort: Int = envOrNone("port") map (_.toInt) getOrElse config.getConfig("http").getInt("port")
   val host: String = envOrNone("host") getOrElse config.getConfig("http").getString("host")
 
-  private val kafkaConf: Config = config.getConfig("kafka")
-  private val elasticSearchConf: Config = config.getConfig("elasticSearch")
+  val kafka: Option[Kafka] = Try(config.getConfig("kafka")) match {
+    case Success(kafkaConf) =>
+      if (kafkaConf.getBoolean("disable") == true) None else {
+        Some(Kafka(kafkaConf.getStringList("artistTopic").asScala.toList,
+          kafkaConf.getString("dlqTopic"), kafkaConf.getString("groupId"), getStringOrElse(kafkaConf.getString("bootstrapServers"), "localhost:9092"),
+          getStringOrElse(kafkaConf.getString("zookeeperServer"), "localhost:2181")))
+      }
+    case _ => None
+  }
 
-  val kafka: Kafka = Kafka(kafkaConf.getBoolean("disable"), kafkaConf.getString("artistTopic"), kafkaConf.getString("dlqTopic"), kafkaConf.getString("groupId"), kafkaConf.getString("bootstrapServers"))
+  private val elasticSearchConf: Config = config.getConfig("elasticSearch")
 
   val elasticSearch = ElasticSearch(elasticSearchConf.getString("host"), elasticSearchConf.getString("index1"), elasticSearchConf.getString("artistType"), elasticSearchConf.getString("albumType"))
 

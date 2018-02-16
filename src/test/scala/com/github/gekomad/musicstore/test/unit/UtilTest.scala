@@ -31,13 +31,9 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
-class UtilTest extends FunSuite with BeforeAndAfter {
+class UtilTest extends FunSuite {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-
-  before {}
-
-  after {}
 
   test("Create sql schema") {
     val o: Future[(Try[String], Try[Vector[MTable]])] = for {

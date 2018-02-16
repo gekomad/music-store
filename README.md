@@ -45,17 +45,9 @@ Music Store
 
     docker run -d --name ELASTIC-http4s_slick_kafka_elastic -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:6.1.3
 
-#### Create virtual network
+#### Install Kafka Development Environment and web interface at http://127.0.1.1:3030
 
-    docker network create net-http4s_slick_kafka_elastic
-
-#### Install Zookeeper
-
-    docker run -d --name ZOOKEEPER-http4s_slick_kafka_elastic --network net-http4s_slick_kafka_elastic zookeeper:3.4
-
-#### Install Kafka
-
-    docker run -d --name KAFKA-http4s_slick_kafka_elastic -p 9092:9092 --network net-http4s_slick_kafka_elastic --env ZOOKEEPER_IP=ZOOKEEPER-http4s_slick_kafka_elastic ches/kafka
+    docker run -d --name KAFKA-http4s_slick_kafka_elastic -p 2181:2181 -p 3030:3030 -p 8081:8081 -p 8082:8082 -p 8083:8083 -p 9092:9092 -e ADV_HOST=192.168.99.100 landoop/fast-data-dev
 
 ## Run integration test
 

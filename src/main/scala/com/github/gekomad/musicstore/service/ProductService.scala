@@ -57,7 +57,7 @@ import scala.util.{Failure, Success, Try}
 object ProductService {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-  val kafkaProducer = Producers.KafkaProducer1()
+  lazy val kafkaProducer = Properties.kafka.map(kafka => Producers.KafkaProducer1(kafka))
 
   implicit val strategy = fs2.Strategy.fromFixedDaemonPool(10)
 
@@ -84,7 +84,7 @@ object ProductService {
 
           avroArtist match {
             case Left(f) =>
-              log.error(s"error decode avroArtist $json $f")
+              log.error(s"error decode avroArtist $json", f)
               throw f
             case Right(s) =>
               val j = parse(s.payload).getOrElse(throw new Exception(s"parse error $payload"))
@@ -97,8 +97,8 @@ object ProductService {
                   ss
               }.recover {
                 case f =>
-                  log.error(s"error to create in db id $json $f. Insert in kafka dlq")
-                  Producers.KafkaProducerDlq().upsertArtist(s.id, payload)
+                  log.error(s"error to create in db id $json Insert in kafka dlq", f)
+                  Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.id, payload))
                   f
               }
           }
@@ -109,7 +109,7 @@ object ProductService {
 
           avroAlbum match {
             case Left(f) =>
-              log.error(s"error decode avroArtist $json $f")
+              log.error(s"error decode avroArtist $json", f)
               throw f
             case Right(s) =>
               val j = parse(s.payload.payload).getOrElse(throw new Exception(s"parse error $payload"))
@@ -122,8 +122,8 @@ object ProductService {
                   ss
               }.recover {
                 case f =>
-                  log.error(s"error to create in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum} $f. Insert in kafka dlq")
-                  Producers.KafkaProducerDlq().upsertArtist(s.idAlbum, payload)
+                  log.error(s"error to create in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum}. Insert in kafka dlq", f)
+                  Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.idAlbum, payload))
                   f
               }
           }
@@ -181,9 +181,8 @@ object ProductService {
 
     artistTry match {
       case Failure(f) => throw new Exception(f)
-      case Success(artist) => if (!Properties.kafka.disabled)
-        kafkaProducer.upsertArtist(id, json)
-      else upsertArtist(id, artist)
+      case Success(artist) => kafkaProducer.map(_.upsertArtist(id, json)).getOrElse(upsertArtist(id, artist))
+
     }
 
   }
@@ -196,10 +195,7 @@ object ProductService {
     albumTry match {
       case Failure(f) =>
         throw new Exception(f)
-      case Success(album) =>
-        if (!Properties.kafka.disabled)
-          kafkaProducer.upsertAlbum(idArtist, idAlbum, json)
-        else upsertAlbum(idArtist, idAlbum, album)
+      case Success(album) => kafkaProducer.map(_.upsertAlbum(idArtist, idAlbum, json)).getOrElse(upsertAlbum(idArtist, idAlbum, album))
     }
   }
 

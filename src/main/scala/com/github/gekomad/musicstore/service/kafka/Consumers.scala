@@ -24,6 +24,7 @@ import com.github.gekomad.musicstore.service.ProductService
 import com.github.gekomad.musicstore.service.kafka.model.Avro.AvroProduct
 import com.github.gekomad.musicstore.utility.MyPredef._
 import com.github.gekomad.musicstore.utility.Properties
+import com.github.gekomad.musicstore.utility.Properties.Kafka
 import com.typesafe.config.ConfigFactory
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecords}
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -45,7 +46,7 @@ object Consumers {
     type A
     type B
     val conf: KafkaConsumer.Conf[A, B]
-    val topic: String
+    val topic: List[String]
 
   }
 
@@ -57,22 +58,23 @@ object Consumers {
       type A = String
       type B = Array[Byte]
 
-      val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
-        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> Properties.kafka.bootstrapServers,
-        ConsumerConfig.GROUP_ID_CONFIG -> Properties.kafka.groupId))),
-        keyDeserializer = new StringDeserializer,
-        valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer
-      )
-
-      val topic = com.github.gekomad.musicstore.utility.Properties.kafka.artistTopic._1
 
     }
 
 
-    def apply() = new KafkaConsumerConf1 {
+    def apply(kafka: Kafka) = new KafkaConsumerConf1 {
+
+
+      val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
+        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers,
+        ConsumerConfig.GROUP_ID_CONFIG -> kafka.groupId))),
+        keyDeserializer = new StringDeserializer,
+        valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer
+      )
 
       val kafkaConsumer = KafkaConsumer(conf)
 
+      val (topic, _) = kafka.artistTopic.unzip
 
       def consume: Unit = {
 
@@ -94,10 +96,9 @@ object Consumers {
 
         }
 
-        kafkaConsumer.subscribe(List(topic).asJava)
+        kafkaConsumer.subscribe(topic.asJava)
 
         while (true) {
-          log.debug(s"pooling topic: ${List(topic)}")
           val records = kafkaConsumer.poll(10.seconds.toMillis)
 
           go(records)
@@ -117,26 +118,31 @@ object Consumers {
       type A = String
       type B = Array[Byte]
 
+
+    }
+
+    def apply(kafka: Kafka) = new KafkaConsumerConfDlq {
+
+
       val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
-        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> Properties.kafka.bootstrapServers,
-        ConsumerConfig.GROUP_ID_CONFIG -> Properties.kafka.groupId))),
+        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers,
+        ConsumerConfig.GROUP_ID_CONFIG -> kafka.groupId))),
         keyDeserializer = new StringDeserializer,
         valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer
       )
-      val topic = com.github.gekomad.musicstore.utility.Properties.kafka.dlqTopic._1
-    }
 
-    def apply() = new KafkaConsumerConfDlq {
       val kafkaConsumer = KafkaConsumer(conf)
+
+      val topic = List(kafka.dlqTopic._1)
 
       def consume: Unit = {
 
         import scala.collection.JavaConverters._
 
-        kafkaConsumer.subscribe(List(topic).asJava)
+        kafkaConsumer.subscribe(topic.asJava)
 
         while (true) {
-          log.debug(s"pooling topic: ${List(topic)}")
+
           val records = kafkaConsumer.poll(10.seconds.toMillis)
 
           val read = records.asScala.map { iterator =>

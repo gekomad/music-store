@@ -77,7 +77,7 @@ class ScalaMeter extends FunSuite with BeforeAndAfterAll {
         case Created(_) =>
           Task.now(true)
         case e =>
-          log.error(s"sendJsonNoContent $insertUrl $json $e")
+          log.error(s"sendJsonNoContent $insertUrl $json", e)
           Task.now(false)
       }
       assert(o.unsafeRun())

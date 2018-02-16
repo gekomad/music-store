@@ -54,7 +54,7 @@ object Tables {
     val o = for {
       oo <- dc.db.run(MTable.getTables("%")) recover {
         case e: Exception =>
-          log.error("getTables something went wrong " + e)
+          log.error("getTables something went wrong ", e)
           Vector.empty[MTable]
       }
       if allTables.map(_.shaped.value.tableName).forall(oo.map(x => x.name.name).toList.contains)
@@ -62,7 +62,7 @@ object Tables {
 
     o recover {
       case e: Exception =>
-        log.error("getAlbum something went wrong " + e)
+        log.error("getAlbum something went wrong ", e)
         Failure(e)
     }
   }

@@ -52,7 +52,7 @@ class ElasticTest extends FunSuite {
 
     val pp = p.unsafeAttemptRun().toTry
     pp match {
-      case Failure(f) => log.error(f.toString)
+      case Failure(f) => log.error("err", f)
       case _ =>
     }
     assert(pp.isSuccess)

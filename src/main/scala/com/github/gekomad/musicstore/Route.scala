@@ -63,7 +63,7 @@ object Route {
         case Invalid(ii) =>
           val ll = ii.map { x =>
             val p = Err(x.desc, x.field, x.code)
-            log.error(s"invalid $p")
+            log.error(s"invalid", p)
             p
           }
           BadRequest(ll.asJson)
@@ -86,7 +86,7 @@ object Route {
         case Invalid(ii) =>
           val ll = ii.map { x =>
             val p = Err(x.desc, x.field, x.code)
-            log.error(s"invalid $p")
+            log.error(s"invalid", p)
             p
           }
           BadRequest(ll.asJson)
@@ -138,8 +138,8 @@ object Route {
           record.map(x => jsonOK(Artist(x.id, x.name, x.url, x.activity).asJson)).getOrElse(NotFound(id))
         }.recover {
           case f =>
-            log.error(f.getMessage)
-            InternalServerError("Error " + f.getMessage)
+            log.error("err", f)
+            InternalServerError("Error " + f)
         }
         Task.fromFuture(o).flatMap(a => a)
       }
@@ -153,7 +153,7 @@ object Route {
           record.map(y => jsonOK(Album(y.id, y.title, y.publishDate, y.artistId).asJson)).getOrElse(NotFound(id))
         }.recover {
           case f =>
-            log.error(f.toString)
+            log.error("err", f)
             InternalServerError("Error " + f)
         }
         Task.fromFuture(o).flatMap(a => a)
@@ -219,14 +219,14 @@ object Route {
     case GET -> Root / "admin" / "check" =>
       log.debug("received admin check")
       val elastic = Properties.elasticSearch.check
-      val kafka = Properties.kafka.check
-      val err = (if (!elastic) "ELASTIC SEARCH NOT RESPONDING" else "") + (if (!kafka) "\nKAFKA NOT RESPONDING" else "")
+      val kafka = Properties.kafka.map(c => c.check).getOrElse(true)
+      val err = (if (!elastic) "ELASTIC SEARCH NOT RESPONDING" else "") + (if (kafka != 0) "\nKAFKA NOT RESPONDING" else "")
 
       val k = ProductService.loadAlbum(MyRandom.getRandomUUID.toString)
       val tr1 = k.map { _ =>
         ArtistPayload.random.asJson.hcursor.downField("name").as[String] match {
           case Right(_) =>
-            if (elastic && kafka) Ok("OK") else InternalServerError(err)
+            if (elastic && kafka == 0) Ok("OK") else InternalServerError(err)
           case Left(f) =>
             log.error("Error $err", f)
             InternalServerError(s"$err\n$f")

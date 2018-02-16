@@ -108,7 +108,7 @@ object ElasticService {
         case Created(s) =>
           Task.now(body(s))
         case e =>
-          log.error(e.toString)
+          log.error("err ",e)
           Task.fail(new Exception(e.toString))
       }
     }
@@ -122,7 +122,7 @@ object ElasticService {
         case Created(s) =>
           Task.now(body(s))
         case e =>
-          log.error(s"${e.toString} $uriPut $json")
+          log.error(s"$uriPut $json", e)
           Task.fail(new Exception(e.toString))
       }
     }
@@ -134,7 +134,7 @@ object ElasticService {
       case a: ElasticAlbum =>
         val json: Json = a.asJson
         album(a.my_join_field.parent, id, index, json)
-      case a => log.error(s"Product not found $a")
+      case a => log.error(s"Product not found", a)
         Task.fail(new Exception(s"Product not found $a"))
     }
 
@@ -173,7 +173,7 @@ object ElasticService {
         Task.now(ps)
 
       case e =>
-        log.error(e.toString)
+        log.error("err", e)
         Task.fail(new Exception(e.toString))
     }
     p

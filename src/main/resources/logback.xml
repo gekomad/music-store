@@ -22,6 +22,8 @@
     <logger name="org.apache.kafka" level="error"/>
     <logger name="org.http4s" level="error"/>
     <logger name="com.zaxxer.hikari" level="error"/>
+    <logger name="org.apache.zookeeper" level="error"/>
+    <logger name="org.I0Itec" level="error"/>
 
     <root level="debug">
         <appender-ref ref="file"/>
