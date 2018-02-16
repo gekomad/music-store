@@ -20,6 +20,7 @@ package com.github.gekomad.musicstore.utility
 import scala.collection.JavaConverters._
 
 import com.github.gekomad.musicstore.utility.Net._
+import com.github.gekomad.musicstore.utility.Utility._
 import com.typesafe.config.{Config, ConfigFactory}
 import org.http4s.Uri
 import org.slf4j.{Logger, LoggerFactory}
@@ -32,8 +33,6 @@ import scala.util.{Success, Try}
 
 object Properties {
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-
-  def getStringOrElse(s: => String, d: String) = Try(s).getOrElse(d)
 
   final case class Kafka(artistTopic: List[(String, Int)], dlqTopic: (String, Int), groupId: String, bootstrapServers: String, zookeeperServer: String) {
     private val p = bootstrapServers.split(":")
@@ -107,8 +106,8 @@ object Properties {
     case Success(kafkaConf) =>
       if (kafkaConf.getBoolean("disable") == true) None else {
         Some(Kafka(kafkaConf.getStringList("artistTopic").asScala.toList,
-          kafkaConf.getString("dlqTopic"), kafkaConf.getString("groupId"), getStringOrElse(kafkaConf.getString("bootstrapServers"), "localhost:9092"),
-          getStringOrElse(kafkaConf.getString("zookeeperServer"), "localhost:2181")))
+          kafkaConf.getString("dlqTopic"), kafkaConf.getString("groupId"), getValueOrDefault(kafkaConf.getString("bootstrapServers"), "localhost:9092"),
+          getValueOrDefault(kafkaConf.getString("zookeeperServer"), "localhost:2181")))
       }
     case _ => None
   }

@@ -17,6 +17,7 @@
 
 package com.github.gekomad.musicstore.utility
 
+import scala.util.Try
 import scala.util.matching.Regex
 
 object Utility {
@@ -30,5 +31,6 @@ object Utility {
         case _ => false
       }
 
+  def getValueOrDefault[A](value: => A, default: A): A = Try(value).getOrElse(default)
 
 }
