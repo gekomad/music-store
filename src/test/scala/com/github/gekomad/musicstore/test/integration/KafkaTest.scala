@@ -70,7 +70,7 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
         val message = s"message that has key: $key"
         val record = new ProducerRecord(topic, key.toString, message)
-        val startTime = System.currentTimeMillis()
+        val startTime = System.currentTimeMillis
 
         kafkaProducer.sendWithCallback(record)(_ match {
           case Success(metadata) =>
