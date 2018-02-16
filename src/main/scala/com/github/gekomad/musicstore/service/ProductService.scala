@@ -180,8 +180,14 @@ object ProductService {
     val artistTry = ArtistPayload(json)
 
     artistTry match {
-      case Failure(f) => throw new Exception(f)
-      case Success(artist) => kafkaProducer.map(_.upsertArtist(id, json)).getOrElse(upsertArtist(id, artist))
+      case Failure(f) =>
+        log.error("err upsert", f)
+        throw new Exception(f)
+      case Success(artist) =>
+        kafkaProducer.map(_.upsertArtist(id, json)).getOrElse(upsertArtist(id, artist)).recover { case f =>
+          log.error(s"err upsert id: $id", f)
+          f
+        }
 
     }
 

@@ -108,7 +108,7 @@ object ElasticService {
         case Created(s) =>
           Task.now(body(s))
         case e =>
-          log.error("err ",e)
+          log.error(s"err $uriPut $e")
           Task.fail(new Exception(e.toString))
       }
     }

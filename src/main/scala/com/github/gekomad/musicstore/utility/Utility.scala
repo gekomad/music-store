@@ -31,6 +31,6 @@ object Utility {
         case _ => false
       }
 
-  def getValueOrDefault[A](value: => A, default: A): A = Try(value).getOrElse(default)
+
 
 }

@@ -97,9 +97,10 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
           Task.now(false)
       }
       assert(o1.unsafeRun(), "insert artist")
+
     }
 
-    // insert album
+    log.debug("insert album")
     val albumId = getRandomUUID.toString
 
     {
@@ -118,26 +119,27 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
           Task.now(false)
       }
       assert(o1.unsafeRun(), "insert album")
+
     }
 
-    // read artist
+    log.debug("read artist")
     val l: String = httpClient.expect[String](TEST_SERVER_URL.withPath(ARTIST_PATH) / artistId).unsafeRun
 
     val artistList = decode[Artist](l).right.getOrElse(throw new Exception(s"err decode $l"))
 
     assert(artistList.id == artistId.toString)
-    //read album
+
+    log.debug("read album")
 
     val url = TEST_SERVER_URL.withPath(ALBUM_PATH) / albumId
     val l2 = httpClient.expect[String](url).unsafeRun
-    assert(l2.contains(albumId))
-    httpClient.shutdownNow()
+    assert(l2.contains(albumId),"err")
 
-    //read artist from elastic
-    val e = ElasticService.read(Properties.elasticSearch.index1, Properties.elasticSearch.artistType, artistId.toString)
-    val o = e.unsafeRun
+    log.debug("read artist from elastic")
+    val o = ElasticService.read(Properties.elasticSearch.index1, Properties.elasticSearch.artistType, artistId.toString).unsafeRun
+
     assert(o.status == Ok, "read")
-
+    httpClient.shutdown
   }
 
   test("Get random product") {
@@ -196,6 +198,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       }
       assert(o1.unsafeRun(), "read album must returns 404")
     }
+    httpClient.shutdown
   }
 
   test("Insert wrong name returns BadRequest") {
@@ -220,7 +223,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       }
       assert(o1.unsafeRun(), "insert wrong name returns BadRequest")
     }
-
+    httpClient.shutdown
   }
 
 }

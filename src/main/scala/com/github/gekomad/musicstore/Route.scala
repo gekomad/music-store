@@ -63,7 +63,7 @@ object Route {
         case Invalid(ii) =>
           val ll = ii.map { x =>
             val p = Err(x.desc, x.field, x.code)
-            log.error(s"invalid", p)
+            log.error(s"invalid $p")
             p
           }
           BadRequest(ll.asJson)
@@ -86,7 +86,7 @@ object Route {
         case Invalid(ii) =>
           val ll = ii.map { x =>
             val p = Err(x.desc, x.field, x.code)
-            log.error(s"invalid", p)
+            log.error(s"invalid $p")
             p
           }
           BadRequest(ll.asJson)

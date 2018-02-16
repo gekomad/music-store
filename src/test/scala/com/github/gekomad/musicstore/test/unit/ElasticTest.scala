@@ -43,16 +43,14 @@ class ElasticTest extends FunSuite {
 
     val product: ElasticArtist = ElasticArtist.random
     val id = MyRandom.getRandomUUID.toString
-    val index = "test_index"
+    val index =  Properties.elasticSearch.index1
 
-    val p = ElasticService.insert(id, index, product)
-    p.map { x =>
-      println("put - return body: " + x)
-    }
+    val pp = ElasticService.insert(id, index, product).unsafeAttemptRun().toTry
 
-    val pp = p.unsafeAttemptRun().toTry
+
     pp match {
-      case Failure(f) => log.error("err", f)
+      case Failure(f) =>
+        log.error("err", f)
       case _ =>
     }
     assert(pp.isSuccess)
