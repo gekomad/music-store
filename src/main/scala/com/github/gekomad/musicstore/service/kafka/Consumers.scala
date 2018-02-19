@@ -18,18 +18,16 @@
 package com.github.gekomad.musicstore.service.kafka
 
 import java.io
-
 import cakesolutions.kafka.KafkaConsumer
 import com.github.gekomad.musicstore.service.ProductService
 import com.github.gekomad.musicstore.service.kafka.model.Avro.AvroProduct
 import com.github.gekomad.musicstore.utility.MyPredef._
-import com.github.gekomad.musicstore.utility.Properties
+import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.gekomad.musicstore.utility.Properties.Kafka
 import com.typesafe.config.ConfigFactory
-import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecords}
+import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecords, OffsetResetStrategy}
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.collection.JavaConverters.mapAsJavaMap
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -52,24 +50,20 @@ object Consumers {
 
   object KafkaConsumer1 {
 
-    import scala.collection.JavaConverters._
-
     trait KafkaConsumerConf1 extends KafkaConsumerConf {
       type A = String
       type B = Array[Byte]
-
-
     }
-
 
     def apply(kafka: Kafka) = new KafkaConsumerConf1 {
 
-
-      val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
-        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers,
-        ConsumerConfig.GROUP_ID_CONFIG -> kafka.groupId))),
+      val conf = KafkaConsumer.Conf(
         keyDeserializer = new StringDeserializer,
-        valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer
+        valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer,
+        bootstrapServers = kafka.bootstrapServers,
+        groupId = kafka.groupId,
+        enableAutoCommit = false,
+        autoOffsetReset = OffsetResetStrategy.EARLIEST
       )
 
       val kafkaConsumer = KafkaConsumer(conf)
@@ -99,9 +93,15 @@ object Consumers {
         kafkaConsumer.subscribe(topic.asJava)
 
         while (true) {
-          val records = kafkaConsumer.poll(10.seconds.toMillis)
+          val records = kafkaConsumer.poll(100.seconds.toMillis)
 
-          go(records)
+          go(records).map(_ => kafkaConsumer.commitSync()).recover {
+
+            case f =>
+              log.error("", f)
+              kafkaConsumer.unsubscribe
+              kafkaConsumer.subscribe(topic.asJava)
+          }
         }
 
         kafkaConsumer.close()
@@ -117,12 +117,9 @@ object Consumers {
     trait KafkaConsumerConfDlq extends KafkaConsumerConf {
       type A = String
       type B = Array[Byte]
-
-
     }
 
     def apply(kafka: Kafka) = new KafkaConsumerConfDlq {
-
 
       val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
         ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers,
@@ -159,6 +156,5 @@ object Consumers {
       }
     }
   }
-
 
 }
