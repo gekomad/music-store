@@ -25,9 +25,8 @@ import com.github.gekomad.musicstore.utility.Properties
 import org.slf4j.{Logger, LoggerFactory}
 import slick.jdbc.meta.MTable
 import slick.sql.SqlProfile.ColumnOption.SqlType
-
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success}
+import scala.concurrent.Future
 
 object Tables {
   val log: Logger = LoggerFactory.getLogger(this.getClass)
@@ -35,36 +34,26 @@ object Tables {
   import Properties.dc.profile.api._
 
   val allTables = List(artists, albums)
-  val allTablesSchema = allTables.map(_.schema)
+  val allTablesSchema = artists.schema ++ albums.schema
 
-  def createSchema = {
+  def createSchema: Future[Unit] = {
     val dc = Properties.dc
-    val c = (artists.schema ++ albums.schema).create
-    for {
-      k <- dc.db.run(c).map(_ => Success("ok")) recover {
-        case e: Exception =>
-          log.warn("create schema something went wrong " + e)
-          Success("ok")
-      }
-    } yield k
+    val c = allTablesSchema.create
+    dc.db.run(c)
   }
 
   def loadSchema = {
     val dc = Properties.dc
-    val o = for {
+    for {
       oo <- dc.db.run(MTable.getTables("%")) recover {
         case e: Exception =>
           log.error("getTables something went wrong ", e)
           Vector.empty[MTable]
       }
       if allTables.map(_.shaped.value.tableName).forall(oo.map(x => x.name.name).toList.contains)
-    } yield Success(oo)
+    } yield oo
 
-    o recover {
-      case e: Exception =>
-        log.error("getAlbum something went wrong ", e)
-        Failure(e)
-    }
+    
   }
 
   /*
@@ -134,7 +123,7 @@ object Tables {
 
     def artistId = column[String]("ARTIST_ID", O.Length(36))
 
-    def * = (id, title,dtInsert, publishDate, code, artistId).mapTo[AlbumsType]
+    def * = (id, title, dtInsert, publishDate, code, artistId).mapTo[AlbumsType]
 
     def pk = primaryKey("pk_albums", id)
 

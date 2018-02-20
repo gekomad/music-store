@@ -108,26 +108,22 @@ object Route {
     case GET -> Root / "rest" / "create_sql_schema" =>
       log.debug(s"received create_sql_schema")
 
-      val l: Future[(Try[String], Try[Vector[MTable]])] = for {
-        l1 <- Tables.createSchema
-        l2 <- Tables.loadSchema
-      } yield (l1, l2)
+      val create = Tables.createSchema
 
-      Task.fromFuture(l).flatMap { response =>
-        val (creare, read) = (response._1, response._2)
-        creare match {
-          case Failure(x) =>
-            log.error("Create schema ERROR", x)
-            InternalServerError("Error " + x.getMessage)
-          case Success(_) =>
-            read match {
-              case Failure(xx) =>
-                log.error("Read schema error ", xx)
-                InternalServerError("Error " + xx.getMessage)
-              case Success(_) => Ok("Create and Read schema OK")
-            }
+      val o = create.flatMap { _ =>
+        val read = Tables.loadSchema
+        read.map { _ =>
+          Ok("Create and Read schema OK")
+        }.recover { case err =>
+          log.error("Read schema error ", err)
+          InternalServerError("Error " + err.getMessage)
         }
+      }.recover {
+        case err =>
+          log.error("Create schema ERROR", err)
+          InternalServerError("Error " + err.getMessage)
       }
+      Task.fromFuture(o).flatMap(a => a)
 
     case GET -> Root / "rest" / "artist" / id =>
       log.debug(s"received $id")

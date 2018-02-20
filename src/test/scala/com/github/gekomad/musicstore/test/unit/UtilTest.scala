@@ -20,31 +20,14 @@ package com.github.gekomad.musicstore.test.unit
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import com.github.gekomad.musicstore.model.sql.Tables
 import com.github.gekomad.musicstore.utility.MyPredef._
 import com.github.gekomad.musicstore.utility.Utility._
 import org.scalatest._
 import org.slf4j.{Logger, LoggerFactory}
-import slick.jdbc.meta.MTable
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success, Try}
 
 class UtilTest extends FunSuite {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-
-  test("Create sql schema") {
-    val o: Future[(Try[String], Try[Vector[MTable]])] = for {
-      l1 <- Tables.createSchema
-      l2 <- Tables.loadSchema
-    } yield (l1, l2)
-    val (create, read) = Await.result(o, Duration.Inf)
-    assert(create.isSuccess)
-    assert(read.isSuccess)
-  }
-
   test("Check Domain") {
     assert(!isDomain("ssss"))
     assert(!isDomain(""))
@@ -68,14 +51,9 @@ class UtilTest extends FunSuite {
   }
 
   test("isUUID") {
-
     import com.github.gekomad.musicstore.utility.UUIDable._
     import com.github.gekomad.musicstore.utility.UUIDableInstances._
-
-
     assert("ce68ef4d-c44f-4936-89a3-adaac691c369".isUUID)
     assert(!"cc".isUUID)
-
-
   }
 }

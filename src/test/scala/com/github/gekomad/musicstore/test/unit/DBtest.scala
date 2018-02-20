@@ -17,26 +17,16 @@
 
 package com.github.gekomad.musicstore.test.unit
 
-import java.sql.Timestamp
-import java.time.LocalDate
-import java.util.UUID
-
 import com.github.gekomad.musicstore.model.sql.Tables
-import com.github.gekomad.musicstore.model.sql.Tables.{albums, artists}
 import com.github.gekomad.musicstore.model.sql.Tables.{AlbumsType, ArtistsType}
 import com.github.gekomad.musicstore.service.{AlbumDAO, ArtistDAO}
 import com.github.gekomad.musicstore.utility.MyRandom
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.slf4j.{Logger, LoggerFactory}
 import com.github.gekomad.musicstore.utility._
-import com.github.gekomad.musicstore.utility.MyPredef._
-import slick.dbio.Effect.Write
-
 import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
-import scala.util.parsing.json.JSONObject
 
 class DBtest extends FunSuite with BeforeAndAfterAll {
 
@@ -47,20 +37,19 @@ class DBtest extends FunSuite with BeforeAndAfterAll {
   val db: Database = Properties.dc.db
 
   private def dropSchema: Future[Unit] = {
-    assert(Properties.dc.profile.toString.contains("H2Profile"), "not dropped")
-    db.run((albums.schema ++ artists.schema).drop)
+    assert(Properties.dc.profile.toString.contains("H2Profile"), "db is not H2Profile")
+    db.run(Tables.allTablesSchema.drop)
   }
 
   override def beforeAll(): Unit = {
-
-    val ll2 = Tables.createSchema
-    val res = Await.result(ll2, Duration.Inf)
-    assert(res.isSuccess)
-
+    val ll2 = dropSchema.flatMap { _ =>
+      Tables.createSchema.map(_ => true).recover { case _ => false }
+    }
+    assert(Await.result(ll2, Duration.Inf))
   }
 
   override def afterAll(): Unit = {
-
+    dropSchema
   }
 
   test("no transactionally test insert only artist") {

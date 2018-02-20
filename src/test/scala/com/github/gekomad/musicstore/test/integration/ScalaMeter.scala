@@ -24,7 +24,7 @@ import io.circe.syntax._
 import com.github.gekomad.musicstore.{BlazeHttpServer, Route, StartupServices}
 import com.github.gekomad.musicstore.test.integration.Common._
 import com.github.gekomad.musicstore.utility.MyRandom._
-import com.github.gekomad.musicstore.utility.{Log, Properties}
+import com.github.gekomad.musicstore.utility.{ForkJoinCommon, Log, Net, Properties}
 import org.http4s._
 import org.http4s.client.blaze._
 import org.http4s.client.Client
@@ -38,7 +38,6 @@ import java.util.concurrent._
 
 import ch.qos.logback.classic.Level
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
-import com.github.gekomad.musicstore.utility.ForkJoinCommon
 import com.github.gekomad.musicstore.utility.Net.httpPut
 import fs2.Task
 
@@ -52,8 +51,8 @@ class ScalaMeter extends FunSuite with BeforeAndAfterAll {
     .run
 
   override def beforeAll(): Unit = {
-    val o = createSchema.unsafeRun().status
-    assert(o == Ok, "error in create schema")
+    val o2 = createSchema.unsafeRun()
+    assert(o2.status == Ok || Net.body(o2).contains("""Table "ARTISTS" already exists"""))
     StartupServices
   }
 
