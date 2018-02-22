@@ -56,7 +56,7 @@ libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.13.5" % "test"
 libraryDependencies += "com.storm-enroute" %% "scalameter" % "0.8.2" % "test"
-libraryDependencies += "net.cakesolutions" %% "scala-kafka-client-testkit" % "1.0.0" % "test"
+libraryDependencies += "net.cakesolutions" %% "scala-kafka-client-testkit" % kafkaVersion % "test"
 
 testOptions += Tests.Setup(_ => sys.props("testing") = "application_INTEGRATION_TEST.conf")
 parallelExecution in Test := false
