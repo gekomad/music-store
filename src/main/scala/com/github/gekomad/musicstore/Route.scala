@@ -38,7 +38,7 @@ import slick.jdbc.meta.MTable
 
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
-import fs2.Task
+import fs2.{Strategy, Task}
 import com.github.gekomad.musicstore.utility.{MyRandom, Properties}
 import com.github.gekomad.musicstore.utility.MyPredef._
 import io.circe.parser.parse
@@ -55,11 +55,11 @@ object Route {
 
   def jsonOK(s1: Json): Task[Response] = Ok(removeNull(s1)).putHeaders(Header("Content-Type", "application/json"))
 
-  implicit val strategy = fs2.Strategy.fromFixedDaemonPool(10)
+  implicit val strategy: Strategy = fs2.Strategy.fromFixedDaemonPool(10)
 
   private def upsertAlbum(req: Request, idArtist: String, idAlbum: String) = {
     val p = req.as[String].map { json =>
-      validateArtist.validateAlbum(json) match {
+      Validator.validateAlbum(json) match {
         case Invalid(ii) =>
           val ll = ii.map { x =>
             val p = Err(x.desc, x.field, x.code)
@@ -82,7 +82,7 @@ object Route {
 
   private def upsertArtist(req: Request, id: String) = {
     val p = req.as[String].map { json =>
-      validateArtist.validateArtist(json) match {
+      Validator.validateArtist(json) match {
         case Invalid(ii) =>
           val ll = ii.map { x =>
             val p = Err(x.desc, x.field, x.code)
@@ -131,7 +131,7 @@ object Route {
       else {
         val x: Future[Option[Tables.ArtistsType]] = ProductService.loadArtist(id)
         val o = x.map { record =>
-          record.map(x => jsonOK(Artist(x.id, x.name, x.url, x.activity).asJson)).getOrElse(NotFound(id))
+          record.fold(NotFound(id))(x => jsonOK(Artist(x.id, x.name, x.url, x.activity).asJson))
         }.recover {
           case f =>
             log.error("err", f)
@@ -146,7 +146,7 @@ object Route {
       else {
         val x: Future[Option[Tables.AlbumsType]] = ProductService.loadAlbum(id)
         val o = x.map { record =>
-          record.map(y => jsonOK(Album(y.id, y.title, y.publishDate, y.artistId).asJson)).getOrElse(NotFound(id))
+          record.fold(NotFound(id))(y => jsonOK(Album(y.id, y.title, y.publishDate, y.artistId).asJson))
         }.recover {
           case f =>
             log.error("err", f)
@@ -180,8 +180,8 @@ object Route {
     case req@PUT -> Root / "rest" / "artist" / id =>
       log.debug(s"create artist $id")
       // PUT is idempotent
-      val p = ProductService.loadArtist(id).map { art =>
-        art.map(_ => Created("artist exists")).getOrElse(upsertArtist(req, id))
+      val p: Future[Task[Response]] = ProductService.loadArtist(id).map { art =>
+        art.fold(upsertArtist(req, id))(_ => Created("artist exists"))
       }
       Task.fromFuture(p).flatMap(a => a)
 
@@ -189,7 +189,7 @@ object Route {
       log.debug(s"create artist $idAlbum")
       // PUT is idempotent
       val p = ProductService.loadAlbum(idAlbum).map { art =>
-        art.map(_ => Created("album exists")).getOrElse(upsertAlbum(req, idArtist, idAlbum))
+        art.fold(upsertAlbum(req, idArtist, idAlbum))(_ => Created("album exists"))
       }
       Task.fromFuture(p).flatMap(a => a)
 
@@ -215,7 +215,7 @@ object Route {
     case GET -> Root / "admin" / "check" =>
       log.debug("received admin check")
       val elastic = Properties.elasticSearch.check
-      val kafka = Properties.kafka.map(c => c.check).getOrElse(true)
+      val kafka = Properties.kafka.fold(0)(c => c.check)
       val err = (if (!elastic) "ELASTIC SEARCH NOT RESPONDING" else "") + (if (kafka != 0) "\nKAFKA NOT RESPONDING" else "")
 
       val k = ProductService.loadAlbum(MyRandom.getRandomUUID.toString)

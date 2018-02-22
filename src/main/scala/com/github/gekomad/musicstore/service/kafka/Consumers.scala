@@ -70,7 +70,7 @@ object Consumers {
 
       val (topic, _) = kafka.artistTopic.unzip
 
-      def consume: Unit = {
+      def consume(): Unit = {
 
         import scala.collection.JavaConverters._
 
@@ -99,7 +99,7 @@ object Consumers {
 
             case f =>
               log.error("", f)
-              kafkaConsumer.unsubscribe
+              kafkaConsumer.unsubscribe()
               kafkaConsumer.subscribe(topic.asJava)
           }
         }
@@ -132,7 +132,7 @@ object Consumers {
 
       val topic = List(kafka.dlqTopic._1)
 
-      def consume: Unit = {
+      def consume(): Unit = {
 
         import scala.collection.JavaConverters._
 

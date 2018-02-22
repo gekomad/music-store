@@ -26,14 +26,14 @@ import scala.concurrent.Future
 object StartupServices {
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  Properties.kafka.map { kafka =>
+  Properties.kafka.fold(log.info("Kafka is disabled")){ kafka =>
 
     log.info("Kafka is enabled")
 
     kafka.artistTopic.map(topic => 0 until topic._2).foreach { a =>
       log.info(s"instantiate Consumer #$a")
 
-      Future(Consumers.KafkaConsumer1(kafka).consume).recover {
+      Future(Consumers.KafkaConsumer1(kafka).consume()).recover {
         case e => log.error(s"error starting consume publish topic", e)
       }
     }
@@ -41,11 +41,9 @@ object StartupServices {
     (0 until kafka.dlqTopic._2).foreach { a =>
       log.info(s"instantiate Consumer dlq #$a")
 
-      Future(Consumers.KafkaConsumerDlq(kafka).consume).recover {
+      Future(Consumers.KafkaConsumerDlq(kafka).consume()).recover {
         case e => log.error(s"error starting consume dlq topic", e)
       }
     }
-
-  }.getOrElse(log.info("Kafka is disabled"))
-
+  }
 }

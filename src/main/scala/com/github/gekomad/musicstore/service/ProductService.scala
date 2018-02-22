@@ -27,7 +27,7 @@ import com.github.gekomad.musicstore.service.AlbumDAO.artistIdByAlbumId
 import com.github.gekomad.musicstore.service.kafka.Producers
 import com.github.gekomad.musicstore.service.kafka.model.Avro.{AvroAlbum, AvroArtist, AvroPayload, AvroProduct}
 import com.github.gekomad.musicstore.utility.Properties
-import fs2.Task
+import fs2.{Strategy, Task}
 import io.circe.Json
 import org.http4s.Response
 import org.http4s.dsl.Ok
@@ -50,6 +50,10 @@ import io.circe.generic.auto._
 import io.circe.java8.time._
 import java.io
 
+import cakesolutions.kafka.KafkaProducer
+import com.github.gekomad.musicstore.service.kafka.Producers.KafkaProducer1
+import org.apache.kafka.clients.producer.RecordMetadata
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -57,19 +61,27 @@ import scala.util.{Failure, Success, Try}
 object ProductService {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-  lazy val kafkaProducer = Properties.kafka.map(kafka => Producers.KafkaProducer1(kafka))
+  lazy val kafkaProducer: Option[KafkaProducer1.KafkaProducerConf1 {
+    val kafkaProducer: KafkaProducer[String, Array[Byte]]
 
-  implicit val strategy = fs2.Strategy.fromFixedDaemonPool(10)
+    val topic: List[String]
 
-  def searchTrack(name: String) = ElasticService.searchTrack(name)()
+    val conf: KafkaProducer.Conf[String, Array[Byte]]
 
-  def searchArtistByname(name: String) = ElasticService.searchArtistByName(name)()
+    def producer(kafkaProducer: KafkaProducer[String, Array[Byte]], article: AvroProduct, topics: List[String]): Future[List[RecordMetadata]]
+  }] = Properties.kafka.map(kafka => Producers.KafkaProducer1(kafka))
+
+  implicit val strategy: Strategy = fs2.Strategy.fromFixedDaemonPool(10)
+
+  def searchTrack(name: String): Task[List[(String, ElasticAlbum)]] = ElasticService.searchTrack(name)()
+
+  def searchArtistByname(name: String): Task[List[ElasticArtist]] = ElasticService.searchArtistByName(name)()
 
   def loadArtist(id: String): Future[Option[Tables.ArtistsType]] = ArtistDAO.load(id)
 
   def loadAlbum(id: String): Future[Option[Tables.AlbumsType]] = AlbumDAO.load(id)
 
-  def storeList(avroList: List[AvroProduct]) = {
+  def storeList(avroList: List[AvroProduct]): Future[List[io.Serializable]] = {
     log.debug("storeList")
 
     val a = avroList.map { avro =>
@@ -158,10 +170,10 @@ object ProductService {
 
   }
 
-  def deleteArtist(id: String) = {
+  def deleteArtist(id: String): Task[Response] = {
     val deleteArtistAndAlbumFromNOSQL = ElasticService.deleteArtistAndAlbums(Properties.elasticSearch.index1, Properties.elasticSearch.artistType, id)
 
-    val deleteArtistAndAlbumFromSQL = ArtistDAO.delete(id).map(a => Response(Ok))
+    val deleteArtistAndAlbumFromSQL = ArtistDAO.delete(id).map(_ => Response(Ok))
 
     Task.fromFuture(deleteArtistAndAlbumFromSQL).flatMap(_ => deleteArtistAndAlbumFromNOSQL)
   }
@@ -184,7 +196,9 @@ object ProductService {
         log.error("err upsert", f)
         throw new Exception(f)
       case Success(artist) =>
-        kafkaProducer.map(_.upsertArtist(id, json)).getOrElse(upsertArtist(id, artist)).recover { case f =>
+        kafkaProducer.fold(upsertArtist(id, artist)) {
+          _.upsertArtist(id, json)
+        }.recover { case f =>
           log.error(s"err upsert id: $id", f)
           f
         }
@@ -201,7 +215,7 @@ object ProductService {
     albumTry match {
       case Failure(f) =>
         throw new Exception(f)
-      case Success(album) => kafkaProducer.map(_.upsertAlbum(idArtist, idAlbum, json)).getOrElse(upsertAlbum(idArtist, idAlbum, album))
+      case Success(album) => kafkaProducer.fold(upsertAlbum(idArtist, idAlbum, album))(_.upsertAlbum(idArtist, idAlbum, json))
     }
   }
 

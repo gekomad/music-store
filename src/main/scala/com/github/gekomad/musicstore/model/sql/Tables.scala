@@ -42,7 +42,7 @@ object Tables {
     dc.db.run(c)
   }
 
-  def loadSchema = {
+  def loadSchema: Future[Vector[MTable]] = {
     val dc = Properties.dc
     for {
       oo <- dc.db.run(MTable.getTables("%")) recover {

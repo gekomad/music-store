@@ -21,7 +21,7 @@ import com.github.gekomad.musicstore.model.json.elasticsearch.{ElasticProductBas
 import com.github.gekomad.musicstore.model.json.elasticsearch.Products.{ElasticAlbum, ElasticArtist}
 import com.github.gekomad.musicstore.utility.Net._
 import com.github.gekomad.musicstore.utility.Properties
-import fs2.Task
+import fs2.{Strategy, Task}
 import io.circe._
 import io.circe.syntax._
 import org.http4s.{Response, Uri}
@@ -50,14 +50,14 @@ object ElasticService {
   val log: Logger = LoggerFactory.getLogger(this.getClass)
   private val httpClient = PooledHttp1Client()
 
-  implicit val musicIndex = Properties.elasticSearch.index1
-  implicit val artistType = Properties.elasticSearch.artistType
-  implicit val albumType = Properties.elasticSearch.albumType
-  implicit val strategy3 = fs2.Strategy.fromFixedDaemonPool(10)
+  implicit val musicIndex: String = Properties.elasticSearch.index1
+  implicit val artistType: String = Properties.elasticSearch.artistType
+  implicit val albumType: String = Properties.elasticSearch.albumType
+  implicit val strategy3: Strategy = fs2.Strategy.fromFixedDaemonPool(10)
 
-  def routing(index: String, theType: String, childId: String, parentId: String) = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$childId?routing=$parentId""")
+  def routing(index: String, theType: String, childId: String, parentId: String): Uri = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$childId?routing=$parentId""")
 
-  def byId(index: String, theType: String, id: String) = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$id""")
+  def byId(index: String, theType: String, id: String): Uri = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$id""")
 
   def searchArtistByName(name: String)(index: String = musicIndex): Task[List[ElasticArtist]] = {
     val uri = Properties.elasticSearch.host.withPath(s"""/$index/$artistType/_search?q=name:$name""")

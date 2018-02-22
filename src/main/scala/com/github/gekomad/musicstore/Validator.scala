@@ -40,7 +40,7 @@ import com.github.gekomad.musicstore.utility.UUIDable._
 import com.github.gekomad.musicstore.utility.UUIDableInstances._
 import io.circe.Decoder.Result
 
-object validateArtist {
+object Validator {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
@@ -60,7 +60,7 @@ object validateArtist {
   }
 
 
-  def validateId(id: String) = if (id.isUUID)
+  def validateId(id: String): Validated[NonEmptyList[Err], String] = if (id.isUUID)
     Validated.valid(id)
   else
     Validated.invalidNel(Err(s"ID is malformed", id, MyErrors.InsertError))
@@ -85,7 +85,7 @@ object validateArtist {
     val cursor: HCursor = doc.hcursor
 
     val checkName = fieldIsValid[String](cursor, "name", !isBlank(_))
-    val checkUrl = fieldIsValid[String](cursor, "url", isDomain, true)
+    val checkUrl = fieldIsValid[String](cursor, "url", isDomain, optional = true)
     // val checkId: Validated[NonEmptyList[Err], String] = fieldIsValid(cursor, "ishDate, album.code, album.artistId.toStrid", _.isUUID)
 
     val l = checkName |@| checkUrl // |@| checkId //|@| checkAlbum
@@ -94,7 +94,7 @@ object validateArtist {
 
   }
 
-  def validateAlbum(json: String) = {
+  def validateAlbum(json: String): Validated[NonEmptyList[Err], (String, Int)] = {
     log.debug(s"validateAlbum: $json")
 
     val doc: Json = parse(json).getOrElse(Json.Null)

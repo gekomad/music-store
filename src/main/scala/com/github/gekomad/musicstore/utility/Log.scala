@@ -59,7 +59,7 @@ object Log {
     bkLevels
   }
 
-  def setLogLevels(bk: Map[String, Level]) = {
+  def setLogLevels(bk: Map[String, Level]): Unit = {
     val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
     bk.foreach(x => loggerContext.getLogger(x._1).setLevel(bk(x._1)))
   }

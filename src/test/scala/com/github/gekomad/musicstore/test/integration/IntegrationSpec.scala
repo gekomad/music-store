@@ -67,7 +67,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
     blazerServer.shutdownNow()
   }
 
-  def sendJsonBadRequest(uri: Uri, body: Json)(httpClient: Client) =
+  def sendJsonBadRequest(uri: Uri, body: Json)(httpClient: Client): Boolean =
     httpPut(uri, body)(httpClient) {
       case BadRequest(_) =>
         Task.now(true)
@@ -151,7 +151,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
     assert(p1.isRight)
     val p = p1.getOrElse(throw new Exception)
     assert(p.size == 1)
-    assert(p(0).name.size != 0)
+    assert(p.head.name.nonEmpty)
     httpClient.shutdownNow()
   }
 

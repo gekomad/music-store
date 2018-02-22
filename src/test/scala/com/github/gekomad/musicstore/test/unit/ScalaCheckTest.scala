@@ -23,7 +23,7 @@ import org.scalacheck.{Gen, Prop, Properties}
 
 object ScalaCheckTest extends Properties("UtilTest2") {
 
-  val alphaStrAndNull = frequency(
+  val alphaStrAndNull: Gen[String] = frequency(
     (20, Gen.alphaStr),
     (1, null: String)
   )

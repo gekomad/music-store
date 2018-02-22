@@ -34,15 +34,17 @@ import scala.util.{Failure, Success, Try}
 import com.github.gekomad.musicstore.utility.Kafka._
 import cakesolutions.kafka.testkit.KafkaServer
 
+import scala.collection.mutable.ListBuffer
+
 class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
   private val kafkaServer = new KafkaServer
 
-  override def beforeAll() = kafkaServer.startup()
+  override def beforeAll(): Unit = kafkaServer.startup()
 
-  override def afterAll() = kafkaServer.close()
+  override def afterAll(): Unit = kafkaServer.close()
 
   case class Msg(consumerId: Int, partition: Int, offset: Long, key: String, value: String)
 
@@ -59,20 +61,20 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
     createTopic(topic = topic, partitionSize = 3, zookeeperHosts = s"localhost:${kafkaServer.zookeeperPort}")
 
-    def produce = {
+    def produce(): Unit = {
       val conf = KafkaProducer.Conf[String, String](keySerializer = new StringSerializer, valueSerializer = new StringSerializer,
         bootstrapServers = s"localhost:${kafkaServer.kafkaPort}", acks = "1", retries = 3, lingerMs = 1)
 
       val kafkaProducer = KafkaProducer(conf)
 
 
-      (0 until 10).map { key =>
+      (0 until 10).foreach { key =>
 
         val message = s"message that has key: $key"
         val record = new ProducerRecord(topic, key.toString, message)
         val startTime = System.currentTimeMillis
 
-        kafkaProducer.sendWithCallback(record)(_ match {
+        kafkaProducer.sendWithCallback(record) {
           case Success(metadata) =>
 
             log.debug(
@@ -80,7 +82,7 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
           case Failure(f) =>
             log.error(s"error sending message($key, $message)", f)
-        })
+        }
 
       }
 
@@ -92,7 +94,7 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
       log.info(s"starting consumer $id")
 
-      val list = scala.collection.mutable.ListBuffer.empty[Msg]
+      val list: ListBuffer[Msg] = scala.collection.mutable.ListBuffer.empty[Msg]
 
       val conf = KafkaConsumer.Conf(
         keyDeserializer = new StringDeserializer,
@@ -123,7 +125,7 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
     val c1 = Consumer(1)
     val c2 = Consumer(2)
 
-    produce
+    produce()
 
     Thread.sleep(10000)
 
@@ -165,18 +167,18 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
     createTopic(topic = topic, partitionSize = 1, zookeeperHosts = s"localhost:${kafkaServer.zookeeperPort}")
 
-    def produce = {
+    def produce(): Unit = {
 
       val conf = KafkaProducer.Conf[String, String](keySerializer = new StringSerializer, valueSerializer = new StringSerializer,
         bootstrapServers = s"localhost:${kafkaServer.kafkaPort}", acks = "1", retries = 3, lingerMs = 1)
       val kafkaProducer = KafkaProducer(conf)
       val startTime = System.currentTimeMillis()
 
-      (0 until 10).map { key =>
+      (0 until 10).foreach { key =>
 
         val message = s"message that has key: $key"
         val record = new ProducerRecord(topic, key.toString, message)
-        kafkaProducer.sendWithCallback(record)(_ match {
+        kafkaProducer.sendWithCallback(record) {
           case Success(metadata) =>
 
             log.debug(
@@ -184,18 +186,18 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
           case Failure(f) =>
             log.error(s"error sending message($key, $message)", f)
-        })
+        }
         log.debug(s"sent $message")
       }
 
-      kafkaProducer.close
+      kafkaProducer.close()
     }
 
     final case class Consumer(id: Int) {
 
       log.debug(s"starting consumer $id")
 
-      val list = scala.collection.mutable.ListBuffer.empty[Msg]
+      val list: ListBuffer[Msg] = scala.collection.mutable.ListBuffer.empty[Msg]
 
       val conf = KafkaConsumer.Conf(
         keyDeserializer = new StringDeserializer,
@@ -232,7 +234,7 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
               }
             case f =>
               log.error("", f)
-              kafkaConsumer.unsubscribe
+              kafkaConsumer.unsubscribe()
               kafkaConsumer.subscribe(List(topic).asJava)
           }
         }
@@ -242,11 +244,11 @@ class KafkaTest extends FunSuite with BeforeAndAfterAll {
 
     val c1 = Consumer(1)
 
-    produce
+    produce()
 
     Thread.sleep(10000)
 
-    val tot = (c1.list).toList
+    val tot = c1.list.toList
 
     val readFromConsumer = List(
       Msg(consumerId = 1, partition = 0, offset = 0l, key = "0", value = "message that has key: 0"),

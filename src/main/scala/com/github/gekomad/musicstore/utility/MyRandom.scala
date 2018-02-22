@@ -40,7 +40,7 @@ object MyRandom {
 
   def getRandomInt(until: Int): Int = getRandomInt(0, until)
 
-  def getRandomLocalDate = LocalDate.of(getRandomInt(1973, 2018), getRandomInt(1, 12), getRandomInt(1, 28))
+  def getRandomLocalDate: LocalDate = LocalDate.of(getRandomInt(1973, 2018), getRandomInt(1, 12), getRandomInt(1, 28))
 
   def getRandomLong: Long = scala.util.Random.nextLong()
 
@@ -50,7 +50,7 @@ object MyRandom {
 
   def getRandomUrl: String = "http://www." + (getRandomString(getRandomInt(10) + 3) + extensions(getRandomInt(extensions.length - 1))).toLowerCase
 
-  def getRandomBigString(l: Int = 100) = getRandomString(l).replace('k', ' ').replace('z', ' ').replace('j', ' ')
+  def getRandomBigString(l: Int = 100): String = getRandomString(l).replace('k', ' ').replace('z', ' ').replace('j', ' ')
 
   def getRandomTimestamp: Timestamp = {
     val unixtime = 1293861599 + scala.util.Random.nextDouble() * 60 * 60 * 24 * 365
