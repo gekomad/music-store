@@ -127,8 +127,7 @@ object Route {
 
     case GET -> Root / "rest" / "artist" / id =>
       log.debug(s"received $id")
-      if (!id.isUUID) BadRequest("id is not valid")
-      else {
+      id.isUUID.fold(BadRequest("id is not valid")) { id =>
         val x: Future[Option[Tables.ArtistsType]] = ProductService.loadArtist(id)
         val o = x.map { record =>
           record.fold(NotFound(id))(x => jsonOK(Artist(x.id, x.name, x.url, x.activity).asJson))
@@ -142,8 +141,7 @@ object Route {
 
     case GET -> Root / "rest" / "album" / id =>
       log.debug(s"received $id")
-      if (!id.isUUID) BadRequest("id is not valid")
-      else {
+      id.isUUID.fold(BadRequest("id is not valid")) { id =>
         val x: Future[Option[Tables.AlbumsType]] = ProductService.loadAlbum(id)
         val o = x.map { record =>
           record.fold(NotFound(id))(y => jsonOK(Album(y.id, y.title, y.publishDate, y.artistId).asJson))
@@ -167,15 +165,14 @@ object Route {
 
     case DELETE -> Root / "rest" / "album" / id / artistId =>
       log.debug(s"delete album $id $artistId")
-      if (!id.isUUID) BadRequest(s"album id $id is not valid")
-      else if (!artistId.isUUID) BadRequest(s"artist id $artistId is not valid")
-      else
-        ProductService.deleteAlbum(id, artistId)
+      id.isUUID.fold(BadRequest(s"album id $id is not valid")) { id =>
+        artistId.isUUID.fold(BadRequest(s"artist id $artistId is not valid"))(id => ProductService.deleteAlbum(id, id))
+      }
+
 
     case DELETE -> Root / "rest" / "artist" / id =>
       log.debug(s"delete artist $id")
-      if (!id.isUUID) BadRequest("id is not valid") else
-        ProductService.deleteArtist(id)
+      id.isUUID.fold(BadRequest("id is not valid"))(ProductService.deleteArtist(_))
 
     case req@PUT -> Root / "rest" / "artist" / id =>
       log.debug(s"create artist $id")

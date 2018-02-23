@@ -53,7 +53,8 @@ class UtilTest extends FunSuite {
   test("isUUID") {
     import com.github.gekomad.musicstore.utility.UUIDable._
     import com.github.gekomad.musicstore.utility.UUIDableInstances._
-    assert("ce68ef4d-c44f-4936-89a3-adaac691c369".isUUID)
-    assert(!"cc".isUUID)
+    val idOk = "ce68ef4d-c44f-4936-89a3-adaac691c369"
+    assert(idOk.isUUID.getOrElse("") == idOk)
+    assert("idNOok".isUUID.isEmpty)
   }
 }

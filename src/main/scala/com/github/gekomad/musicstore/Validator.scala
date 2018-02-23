@@ -59,11 +59,9 @@ object Validator {
     }
   }
 
-
-  def validateId(id: String): Validated[NonEmptyList[Err], String] = if (id.isUUID)
-    Validated.valid(id)
-  else
+  def validateId(id: String): Validated[NonEmptyList[Err], String] = id.isUUID.map(Validated.valid(_)).getOrElse {
     Validated.invalidNel(Err(s"ID is malformed", id, MyErrors.InsertError))
+  }
 
   //  def checkAlbums(o: List[Album]) = {
   //
