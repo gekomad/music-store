@@ -15,14 +15,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package com.github.gekomad.musicstore.test.integration
+package com.github.gekomad.musicstore.test.it
 
 import io.circe.generic.auto._
 import io.circe.java8.time._
 import io.circe.parser.decode
 import io.circe.syntax._
 import com.github.gekomad.musicstore.{BlazeHttpServer, Route, StartupServices}
-import com.github.gekomad.musicstore.test.integration.Common._
+import com.github.gekomad.musicstore.test.it.Common._
 import com.github.gekomad.musicstore.utility.MyRandom._
 import com.github.gekomad.musicstore.utility.{ForkJoinCommon, Log, Net, Properties}
 import org.http4s._

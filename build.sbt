@@ -13,6 +13,7 @@ val Http4sVersion = "0.17.6"
 val circeVersion = "0.8.0"
 val slickVersion = "3.2.1"
 val kafkaVersion = "1.0.0"
+val dockerTestkitVersion =  "0.9.5"
 
 scalacOptions := Seq("-unchecked", "-deprecation", "-feature")
 
@@ -53,10 +54,14 @@ libraryDependencies += "org.postgresql" % "postgresql" % "42.2.1"
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 
 //test
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
+//libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.13.5" % "test"
 libraryDependencies += "com.storm-enroute" %% "scalameter" % "0.8.2" % "test"
 libraryDependencies += "net.cakesolutions" %% "scala-kafka-client-testkit" % kafkaVersion % "test"
+
+libraryDependencies += "com.whisk" %% "docker-testkit-scalatest" % "0.9.5" % IntegrationTest
+libraryDependencies += "com.whisk" %% "docker-testkit-impl-spotify" % "0.9.5" % IntegrationTest
+
 
 testOptions += Tests.Setup(_ => sys.props("testing") = "application_INTEGRATION_TEST.conf")
 parallelExecution in Test := false

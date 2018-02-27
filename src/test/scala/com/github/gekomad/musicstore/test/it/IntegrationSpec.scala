@@ -15,7 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package com.github.gekomad.musicstore.test.integration
+package com.github.gekomad.musicstore.test.it
 
 import cats.implicits._
 import fs2.Task
@@ -26,7 +26,7 @@ import io.circe.parser.decode
 import io.circe.syntax._
 import com.github.gekomad.musicstore.utility.Net._
 import com.github.gekomad.musicstore.{BlazeHttpServer, Route, StartupServices}
-import com.github.gekomad.musicstore.test.integration.Common.{log, _}
+import com.github.gekomad.musicstore.test.it.Common.{log, _}
 import com.github.gekomad.musicstore.utility.MyRandom._
 import com.github.gekomad.musicstore.utility.Properties
 import java.util.concurrent.Executors
