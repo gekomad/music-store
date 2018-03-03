@@ -1,4 +1,4 @@
-package com.github.gekomad.musicstore.test.it.elastic
+package com.github.gekomad.musicstore
 
 import com.whisk.docker.impl.spotify.DockerKitSpotify
 import com.whisk.docker.scalatest.DockerTestKit

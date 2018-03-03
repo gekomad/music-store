@@ -1,6 +1,15 @@
-package com.github.gekomad.musicstore.test.it.elastic
+package com.github.gekomad.musicstore
 
-import com.whisk.docker.{DockerContainer, DockerKit, DockerReadyChecker}
+import com.whisk.docker.{
+        DockerCommandExecutor,
+        DockerContainer,
+        DockerContainerState,
+        DockerKit,
+        DockerReadyChecker
+        }
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 trait DockerElasticService extends DockerKit {
 

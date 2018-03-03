@@ -3,11 +3,12 @@ import sbt.Keys.libraryDependencies
 //sbt-native-packager
 enablePlugins(JavaServerAppPackaging)
 
-name := "music-store"
-
-version := "0.0.4-SNAPSHOT"
-organization := "com.github.gekomad"
-scalaVersion := "2.12.4"
+lazy val commonSettings = Seq(
+  name :=  "music-store",
+  version :=  "0.0.4-SNAPSHOT",
+  organization := "com.github.gekomad",
+  scalaVersion := "2.12.4"
+)
 
 val Http4sVersion = "0.17.6"
 val circeVersion = "0.8.0"
@@ -62,6 +63,7 @@ libraryDependencies += "net.cakesolutions" %% "scala-kafka-client-testkit" % kaf
 libraryDependencies += "com.whisk" %% "docker-testkit-scalatest" % "0.9.5" % IntegrationTest
 libraryDependencies += "com.whisk" %% "docker-testkit-impl-spotify" % "0.9.5" % IntegrationTest
 
+lazy val root = (project in file(".")).configs(IntegrationTest).settings(commonSettings, Defaults.itSettings)
 
 testOptions += Tests.Setup(_ => sys.props("testing") = "application_INTEGRATION_TEST.conf")
 parallelExecution in Test := false
