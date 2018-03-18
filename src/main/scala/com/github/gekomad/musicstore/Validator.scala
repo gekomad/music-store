@@ -17,94 +17,109 @@
 
 package com.github.gekomad.musicstore
 
-import java.sql.Timestamp
 import java.time.LocalDate
-
-import cats.data.{NonEmptyList, Validated}
-import cats.implicits._
+import cats.data.Validated
 import com.github.gekomad.musicstore.model.json.in.AlbumPayload
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
 import com.github.gekomad.musicstore.service.{Err, MyErrors}
 import com.github.gekomad.musicstore.utility.MyPredef._
 import com.github.gekomad.musicstore.utility.Utility._
-import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}
 import org.slf4j.{Logger, LoggerFactory}
-
-import scala.annotation.switch
-import io.circe._
-import io.circe.generic.auto._
 import io.circe.java8.time._
 import io.circe.parser.parse
 import com.github.gekomad.musicstore.utility.UUIDable._
 import com.github.gekomad.musicstore.utility.UUIDableInstances._
-import io.circe.Decoder.Result
+import cats.instances.all._
+import cats.syntax.apply._
+import cats.syntax.either._
 
-object validateArtist {
+object Validator {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def fieldIsValid[A: Decoder](cursor: HCursor, field: String, f: A => Boolean, optional: Boolean = false): Validated[NonEmptyList[Err], A] = {
+  type FailSlow[A] = Validated[List[Err], A]
 
-    val node = cursor.downField(field).as[A]
+  def fieldIsValid[A: Decoder](cursor: HCursor, field: String)(check: A => Boolean = (_: A) => true): Either[List[Err], A] = {
 
-    (node: @switch) match {
+    cursor.downField(field).as[A] match {
       case Left(ee) =>
-        Validated.invalidNel(Err(s"${ee.message}", field, MyErrors.DecodeJsonError))
+        Left(List(Err(s"${ee.message}", field, MyErrors.DecodeJsonError)))
       case Right(gg) =>
-        if (f(gg))
-          Validated.valid(gg)
+        if (check(gg))
+          Right(gg)
         else
-          Validated.invalidNel(Err(s"$field is malformed", gg.toString, MyErrors.InsertError))
+          Left(List(Err(s"field '$field' is malformed", gg.toString, MyErrors.InsertError)))
     }
   }
 
+  def validateId(id: String): Either[List[Err], String] = id.isUUID.map(Right(_)).getOrElse {
+    Left(List(Err(s"ID is malformed", id, MyErrors.InsertError)))
+  }
 
-  def validateId(id: String) = if (id.isUUID)
-    Validated.valid(id)
-  else
-    Validated.invalidNel(Err(s"ID is malformed", id, MyErrors.InsertError))
-
-  //  def checkAlbums(o: List[Album]) = {
-  //
-  //    val oo = o.map { x =>
-  //      val p = if (x.duration <= 0) Validated.invalidNel(Err(s"duration is not valid", "duration", MyErrors.InsertError)) else
-  //        Validated.valid("duration")
-  //      p
-  //    }
-  //
-  //
-  //    val pp = oo.reduce((a, b) => a |@| b)
-  //    pp
-  //  }
-
-  def validateArtist(json: String): Validated[NonEmptyList[Err], (String, String)] = {
+  def validateArtist(json: String): FailSlow[ArtistPayload] = {
     log.debug(s"validateArtist: $json")
+
+    def isDomainOption(o: Option[String]): Boolean = o.fold(true)(isDomain(_))
 
     val doc: Json = parse(json).getOrElse(Json.Null)
     val cursor: HCursor = doc.hcursor
 
-    val checkName = fieldIsValid[String](cursor, "name", !isBlank(_))
-    val checkUrl = fieldIsValid[String](cursor, "url", isDomain, true)
-    // val checkId: Validated[NonEmptyList[Err], String] = fieldIsValid(cursor, "ishDate, album.code, album.artistId.toStrid", _.isUUID)
+    val name = fieldIsValid[String](cursor, "name")(!isBlank(_))
+    val genres = fieldIsValid[List[String]](cursor, "genres")()
+    val origin = fieldIsValid[String](cursor, "origin")()
 
-    val l = checkName |@| checkUrl // |@| checkId //|@| checkAlbum
+    val year = fieldIsValid[Int](cursor, "year")()
+    val members = fieldIsValid[List[String]](cursor, "members")()
+    val url = fieldIsValid[Option[String]](cursor, "url")(isDomainOption(_))
+    val activity = fieldIsValid[Boolean](cursor, "activity")()
+    val description = fieldIsValid[Option[String]](cursor, "description")()
 
-    l.tupled
 
+    val artist = (
+      name.toValidated,
+      genres.toValidated,
+      origin.toValidated,
+      year.toValidated,
+      members.toValidated,
+      url.toValidated,
+      activity.toValidated,
+      description.toValidated
+    ).mapN(ArtistPayload.apply)
+
+    artist
   }
 
-  def validateAlbum(json: String) = {
+  def validateAlbum(json: String): FailSlow[AlbumPayload] = {
     log.debug(s"validateAlbum: $json")
 
     val doc: Json = parse(json).getOrElse(Json.Null)
     val cursor: HCursor = doc.hcursor
 
-    val checkTitle = fieldIsValid[String](cursor, "title", !isBlank(_))
-    val checkDuration = fieldIsValid[Int](cursor, "duration", _ != 0)
+    val title = fieldIsValid[String](cursor, "title")(!isBlank(_))
+    val publishDate = fieldIsValid[LocalDate](cursor, "publishDate")()
+    val duration = fieldIsValid[Int](cursor, "duration")(_ != 0)
+    val price = fieldIsValid[Float](cursor, "price")()
+    val tracks = fieldIsValid[List[String]](cursor, "tracks")()
+    val quantity = fieldIsValid[Int](cursor, "quantity")()
+    val discount = fieldIsValid[Float](cursor, "discount")()
+    val seller = fieldIsValid[String](cursor, "seller")()
+    val code = fieldIsValid[String](cursor, "code")()
 
-    val l = checkTitle |@| checkDuration
-    l.tupled
+    val album = (
+      title.toValidated,
+      publishDate.toValidated,
+      duration.toValidated,
+      price.toValidated,
+      tracks.toValidated,
+      quantity.toValidated,
+      discount.toValidated,
+      seller.toValidated,
+      code.toValidated
+    ).mapN(AlbumPayload.apply)
+
+    album
+
   }
 
 }

@@ -24,14 +24,14 @@ import org.slf4j.{Logger, LoggerFactory}
 object Kafka {
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def createTopic(topic: String, zookeeperHosts: String, partitionSize: Int, replicationCount: Int = 1, connectionTimeoutMs: Int = 10000, sessionTimeoutMs: Int = 10000, prop: java.util.Properties = new java.util.Properties) = {
-    val zkUtils = ZkUtils.apply(zookeeperHosts, sessionTimeoutMs, connectionTimeoutMs, false)
+  def createTopic(topic: String, zookeeperHosts: String, partitionSize: Int, replicationCount: Int = 1, connectionTimeoutMs: Int = 10000, sessionTimeoutMs: Int = 10000, prop: java.util.Properties = new java.util.Properties): Unit = {
+    val zkUtils = ZkUtils.apply(zookeeperHosts, sessionTimeoutMs, connectionTimeoutMs, isZkSecurityEnabled = false)
     AdminUtils.createTopic(zkUtils, topic, partitionSize, replicationCount, prop)
     zkUtils.close()
   }
 
-  def deleteTopic(topic: String, zookeeperHosts: String, connectionTimeoutMs: Int = 10000, sessionTimeoutMs: Int = 10000) = {
-    val zkUtils = ZkUtils.apply(zookeeperHosts, sessionTimeoutMs, connectionTimeoutMs, false)
+  def deleteTopic(topic: String, zookeeperHosts: String, connectionTimeoutMs: Int = 10000, sessionTimeoutMs: Int = 10000): Unit = {
+    val zkUtils = ZkUtils.apply(zookeeperHosts, sessionTimeoutMs, connectionTimeoutMs, isZkSecurityEnabled = false)
     AdminUtils.deleteTopic(zkUtils, topic)
     zkUtils.close()
   }

@@ -18,22 +18,20 @@
 package com.github.gekomad.musicstore.utility
 
 import scala.collection.JavaConverters._
-
 import com.github.gekomad.musicstore.utility.Net._
 import com.typesafe.config.{Config, ConfigFactory}
 import org.http4s.Uri
 import org.slf4j.{Logger, LoggerFactory}
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
-
 import scala.language.postfixOps
 import scala.util.Properties.envOrNone
 import scala.util.{Success, Try}
+import com.github.gekomad.musicstore.utility.DefaultableInstances._
+import com.github.gekomad.musicstore.utility.Defaultable._
 
 object Properties {
-  val log: Logger = LoggerFactory.getLogger(this.getClass)
-
-  def getStringOrElse(s: => String, d: String) = Try(s).getOrElse(d)
+  private val log: Logger = LoggerFactory.getLogger(this.getClass)
 
   final case class Kafka(artistTopic: List[(String, Int)], dlqTopic: (String, Int), groupId: String, bootstrapServers: String, zookeeperServer: String) {
     private val p = bootstrapServers.split(":")
@@ -44,11 +42,11 @@ object Properties {
     private val hostz = z(0)
     private val portz = z(1).toInt
 
-    def check = if (!serverListening(hostk, portk)) {
-      log.error("KAFKA NOT RESPONDING")
+    def check: Int = if (!serverListening(hostk, portk)) {
+      log.error("KAFKA IS NOT RESPONDING")
       1
     } else if (!serverListening(hostz, portz)) {
-      log.error("ZOOKEEPER NOT RESPONDING")
+      log.error("ZOOKEEPER IS NOT RESPONDING")
       2
     } else 0
 
@@ -56,7 +54,7 @@ object Properties {
 
   object Kafka {
 
-    def apply(artistTopic: List[String], dlqTopic: String, groupId: String, host: String, zookeeperServer: String) = {
+    def apply(artistTopic: List[String], dlqTopic: String, groupId: String, host: String, zookeeperServer: String): Kafka = {
       Uri.fromString(if (host.contains("://")) host else s"http://$host").getOrElse(throw new Exception).port.getOrElse(throw new Exception)
       Uri.fromString(if (zookeeperServer.contains("://")) zookeeperServer else s"http://$zookeeperServer").getOrElse(throw new Exception).port.getOrElse(throw new Exception)
 
@@ -76,14 +74,14 @@ object Properties {
   }
 
   final case class ElasticSearch(host: Uri, index1: String, artistType: String, albumType: String) {
-    def check = if (!serverListening(host.host.get.value, host.port.getOrElse(throw new Exception))) {
-      log.error("ELASTIC SEARCH NOT RESPONDING")
+    def check: Boolean = if (!serverListening(host.host.get.value, host.port.getOrElse(throw new Exception))) {
+      log.error("ELASTIC SEARCH IS NOT RESPONDING")
       false
     } else true
   }
 
   object ElasticSearch {
-    def apply(host: String, index1: String, artistType: String, albumType: String) = {
+    def apply(host: String, index1: String, artistType: String, albumType: String): ElasticSearch = {
       val uri = Uri.fromString(if (host.contains("://")) host else s"http://$host")
       require(uri.isRight)
       val u: Uri = uri.getOrElse(throw new Exception)
@@ -94,35 +92,41 @@ object Properties {
     }
   }
 
-  val CONFIG_RESOURCE = "config.resource"
-  val confFile: String = sys.props.get("testing").getOrElse(System.getProperty(CONFIG_RESOURCE))
-  require(null != confFile, s"config.resource is blank, use -Dconfig.resource={db_env}")
+  private val CONFIG_RESOURCE: String = "config.resource"
+  private val confFile: String = sys.props.get("testing").getOrElse(System.getProperty(CONFIG_RESOURCE))
+  require(null != confFile, s"config.resource is blank, use -Dconfig.resource=application_{db_env}.conf")
 
-  val config = ConfigFactory.load(confFile)
+  private val config: Config = ConfigFactory.load(confFile)
 
-  val httpPort: Int = envOrNone("port") map (_.toInt) getOrElse config.getConfig("http").getInt("port")
+  val httpPort: Int = envOrNone("port").fold(config.getConfig("http").getInt("port"))(_.toInt)
   val host: String = envOrNone("host") getOrElse config.getConfig("http").getString("host")
 
   val kafka: Option[Kafka] = Try(config.getConfig("kafka")) match {
     case Success(kafkaConf) =>
-      if (kafkaConf.getBoolean("disable") == true) None else {
+
+      if (kafkaConf.getBoolean("disable")) None else {
         Some(Kafka(kafkaConf.getStringList("artistTopic").asScala.toList,
-          kafkaConf.getString("dlqTopic"), kafkaConf.getString("groupId"), getStringOrElse(kafkaConf.getString("bootstrapServers"), "localhost:9092"),
-          getStringOrElse(kafkaConf.getString("zookeeperServer"), "localhost:2181")))
+          kafkaConf.getString("dlqTopic"), kafkaConf.getString("groupId"), getOrDefault(kafkaConf.getString("bootstrapServers"), "localhost:9092"),
+          getOrDefault(kafkaConf.getString("zookeeperServer"), "localhost:2181")))
       }
     case _ => None
   }
 
   private val elasticSearchConf: Config = config.getConfig("elasticSearch")
 
-  val elasticSearch = ElasticSearch(elasticSearchConf.getString("host"), elasticSearchConf.getString("index1"), elasticSearchConf.getString("artistType"), elasticSearchConf.getString("albumType"))
+  val elasticSearch: ElasticSearch = ElasticSearch(elasticSearchConf.getString("host"), elasticSearchConf.getString("index1"), elasticSearchConf.getString("artistType"), elasticSearchConf.getString("albumType"))
 
-  val dc: DatabaseConfig[JdbcProfile] = {
-    require(null != confFile, s"config.resource is blank, use -Dconfig.resource={db_env}")
-    log.info(s"config.resource: $confFile")
-    val d = DatabaseConfig.forConfig[JdbcProfile]("dc", ConfigFactory.load(confFile))
-    log.info(s"max connections: ${d.db.source.maxConnections}")
-    d
+
+  object sql {
+    private val sqlConf = ConfigFactory.load(confFile).getConfig("sql")
+    val dc: DatabaseConfig[JdbcProfile] = {
+      log.info(s"config.resource: $confFile")
+      val d= DatabaseConfig.forConfig[JdbcProfile]("dc", sqlConf)
+      log.info(s"max connections: ${d.db.source.maxConnections}")
+      d
+    }
+    val maxParallelUpsert = sqlConf.getInt("maxParallelUpsert")
   }
+
 }
 

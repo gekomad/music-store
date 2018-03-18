@@ -17,53 +17,38 @@
 
 package com.github.gekomad.musicstore.service
 
-import com.github.gekomad.musicstore.model.json.elasticsearch.{ElasticProductBase, ElasticSearchTemplate}
-import com.github.gekomad.musicstore.model.json.elasticsearch.Products.{ElasticAlbum, ElasticArtist}
-import com.github.gekomad.musicstore.utility.Net._
-import com.github.gekomad.musicstore.utility.Properties
-import fs2.Task
-import io.circe._
-import io.circe.syntax._
-import org.http4s.{Response, Uri}
-import org.http4s.client.blaze.PooledHttp1Client
-import org.http4s.dsl._
-import org.slf4j.{Logger, LoggerFactory}
-import io.circe.syntax._
-import com.github.gekomad.musicstore.utility.MyPredef._
-import java.time.LocalDate
-
-import io.circe.Decoder.Result
-import io.circe.generic.auto._
-import io.circe.java8.time._
-import io.circe.syntax._
-import java.time.LocalDate
-
-import io.circe.Decoder.Result
 import io.circe.parser.parse
 import io.circe.generic.auto._
 import io.circe.java8.time._
-
+import com.github.gekomad.musicstore.model.json.elasticsearch.{ElasticProductBase, ElasticSearchTemplate}
+import com.github.gekomad.musicstore.model.json.elasticsearch.Products.{ElasticAlbum, ElasticArtist}
+import com.github.gekomad.musicstore.utility.Net.{body, _}
+import com.github.gekomad.musicstore.utility.Properties
+import io.circe._
+import io.circe.syntax._
+import org.http4s.{Request, Status, Uri}
+import org.slf4j.{Logger, LoggerFactory}
+import cats.effect.IO
+import org.http4s.client.Client
+import org.http4s.client.blaze._
 import scala.collection.immutable
 
 object ElasticService {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-  private val httpClient = PooledHttp1Client()
+  private val httpClient: Client[IO] = Http1Client[IO]().unsafeRunSync
 
-  implicit val musicIndex = Properties.elasticSearch.index1
-  implicit val artistType = Properties.elasticSearch.artistType
-  implicit val albumType = Properties.elasticSearch.albumType
-  implicit val strategy3 = fs2.Strategy.fromFixedDaemonPool(10)
+  private val artistType: String = Properties.elasticSearch.artistType
+  private val albumType: String = Properties.elasticSearch.albumType
 
-  def routing(index: String, theType: String, childId: String, parentId: String) = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$childId?routing=$parentId""")
+  def routing(index: String, theType: String, childId: String, parentId: String): Uri = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$childId?routing=$parentId""")
 
-  def byId(index: String, theType: String, id: String) = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$id""")
+  def byId(index: String, theType: String, id: String): Uri = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$id""")
 
-  def searchArtistByName(name: String)(index: String = musicIndex): Task[List[ElasticArtist]] = {
+  def searchArtistByName(name: String)(index: String = Properties.elasticSearch.index1) = {
     val uri = Properties.elasticSearch.host.withPath(s"""/$index/$artistType/_search?q=name:$name""")
 
-    val dd = httpClient.expect[String](uri)
-    dd.map { a =>
+    httpClient.expect[String](uri).map { a =>
       val o = parse(a).getOrElse(Json.Null)
 
       val p1 = o.as[ElasticSearchTemplate[ElasticArtist]]
@@ -77,12 +62,11 @@ object ElasticService {
 
   }
 
-  def searchTrack(name: String)(index: String = musicIndex): Task[List[(String, ElasticAlbum)]] = {
+  def searchTrack(name: String)(implicit index: String = Properties.elasticSearch.index1) = {
 
     val uri = Properties.elasticSearch.host.withPath(s"""/$index/$albumType/_search?q=tracks:$name""")
 
-    val dd = httpClient.expect[String](uri)
-    dd.map { a =>
+    httpClient.expect[String](uri).map { a =>
       val o = parse(a).getOrElse(Json.Null)
 
       val p1 = o.as[ElasticSearchTemplate[ElasticAlbum]]
@@ -96,34 +80,39 @@ object ElasticService {
 
   }
 
-  def insert[A <: ElasticProductBase](id: String, index: String, product: A): Task[String] = {
+  def insert[A <: ElasticProductBase](id: String, index: String, product: A): IO[String] = {
 
-    def artist(id: String, index: String, json: Json) = {
+    def artist(id: String, index: String, json: Json): IO[String] = {
       val uriPut = byId(index, artistType, id)
 
       log.debug(s"putElastic: $uriPut $json")
-      httpPut(uriPut, json)(httpClient) {
-        case Ok(s) =>
-          Task.now(body(s))
-        case Created(s) =>
-          Task.now(body(s))
-        case e =>
-          log.error("err ",e)
-          Task.fail(new Exception(e.toString))
+      val s = httpPut(uriPut, json)
+
+      httpClient.fetch(s) {
+        x =>
+          x.status match {
+            case Status.Ok | Status.Created =>
+              body(x)
+            case e =>
+              log.error(s"err $uriPut $e")
+              IO.raiseError(new Exception(e.toString))
+          }
       }
     }
 
-    def album(artistId: String, id: String, index: String, json: Json): Task[String] = {
+    def album(artistId: String, id: String, index: String, json: Json): IO[String] = {
       val uriPut = routing(index, albumType, id, artistId)
       log.debug(s"putElastic: $uriPut $json")
-      httpPut(uriPut, json)(httpClient) {
-        case Ok(s) =>
-          Task.now(body(s))
-        case Created(s) =>
-          Task.now(body(s))
-        case e =>
-          log.error(s"$uriPut $json", e)
-          Task.fail(new Exception(e.toString))
+
+      httpClient.fetch(httpPut(uriPut, json)) {
+        x =>
+          x.status match {
+            case Status.Ok | Status.Created =>
+              body(x)
+            case e =>
+              log.error(s"err $uriPut $e")
+              IO.raiseError(new Exception(e.toString))
+          }
       }
     }
 
@@ -135,14 +124,14 @@ object ElasticService {
         val json: Json = a.asJson
         album(a.my_join_field.parent, id, index, json)
       case a => log.error(s"Product not found", a)
-        Task.fail(new Exception(s"Product not found $a"))
+        IO.raiseError(new Exception(s"Product not found $a"))
     }
 
   }
 
-  def read(index: String, theType: String, id: String): Task[Response] = httpGet(byId(index, theType, id))(httpClient)
+  def read(index: String, theType: String, id: String) = httpGet(byId(index, theType, id))
 
-  def albumsByArtist(index: String, id: String): Task[immutable.Seq[String]] = {
+  def albumsByArtist(index: String, id: String) = {
     val query =
       s""" {
       "query": {
@@ -153,52 +142,118 @@ object ElasticService {
       },"_source": ""
     }"""
 
-    import io.circe.parser.parse
+
     val queryJson: Json = parse(query).getOrElse(throw new Exception(s"err parse $query"))
 
     val uri = Properties.elasticSearch.host.withPath(s"""/$index/_search""")
 
-    val p = httpPost(uri, queryJson)(httpClient) {
-      case Ok(s) =>
-        val a = body(s)
-        val o = parse(a).getOrElse(Json.Null)
+    val s: IO[Request[IO]] = httpPost(uri, queryJson)
 
-        val p1 = o.as[ElasticSearchTemplate[ElasticProductBase]]
-        val p = p1.map { a =>
-          a.hits.hits.map { z =>
-            z._id
-          }
+    httpClient.fetch(s) {
+      x =>
+        x.status match {
+          case Status.Ok =>
+            val a = body(x)
+            val ps = a.map { ss =>
+              val o = parse(ss).getOrElse(Json.Null)
+
+              val p1 = o.as[ElasticSearchTemplate[ElasticProductBase]]
+              val p = p1.map { a =>
+                a.hits.hits.map { z =>
+                  z._id
+                }
+              }
+              val ps: immutable.Seq[String] = p.getOrElse(throw new Exception(s"err decode $p"))
+              ps
+            }
+            ps
+          case e =>
+            log.error(s"err $e")
+            IO.raiseError(new Exception(e.toString))
         }
-        val ps: immutable.Seq[String] = p.getOrElse(throw new Exception(s"err decode $p"))
-        Task.now(ps)
-
-      case e =>
-        log.error("err", e)
-        Task.fail(new Exception(e.toString))
     }
-    p
+
   }
 
-  def deleteArtistAndAlbums(index: String, theType: String, artistId: String): Task[Response] = {
+  def deleteArtistAndAlbums(index: String, theType: String, artistId: String): IO[String] = {
     val albums = albumsByArtist(index, artistId)
 
-    val o = albums.flatMap { albumList =>
-      val o = albumList.map(albumId => deleteAlbum(index, theType, albumId, artistId))
-      o.foldLeft(Task(Response(Ok)))((a, b) => a.flatMap(_ => b))
+    val o = albums.map { albumList =>
+      albumList.map(albumId => deleteAlbum(index, theType, albumId, artistId))
     }
 
-    val uri = byId(index, theType, artistId)
+    o.flatMap { _ =>
+      val uriArtist = byId(index, theType, artistId)
 
-    val v = httpDelete(uri)(httpClient)
-    o.flatMap(_ => v)
+      val dd = httpDelete(uriArtist)
+
+      httpClient.fetch(dd) { x =>
+        x.status match {
+          case Status.Ok =>
+            body(x)
+          case e =>
+            log.error(s"err $e")
+            IO.raiseError(new Exception(e.toString))
+        }
+      }
+    }
+
   }
 
 
-  def deleteAlbum(index: String, theType: String, albumId: String, artistId: String): Task[Response] = {
+  def deleteAlbum(index: String, theType: String, albumId: String, artistId: String): IO[String] = {
     log.debug("deleteAlbum")
     val uri = routing(index, theType, albumId, artistId)
     log.debug(uri.toString())
-    httpDelete(uri)(httpClient)
+    val dd = httpDelete(uri)
+
+    httpClient.fetch(dd) { x =>
+      x.status match {
+        case Status.Ok =>
+          body(x)
+        case e =>
+          log.error(s"err $e")
+          IO.raiseError(new Exception(e.toString))
+      }
+    }
   }
+
+  def createSchema = {
+    val uri = Properties.elasticSearch.host.withPath("/music")
+    val b =
+      """
+        {
+            "mappings": {
+               "doc":{
+                  "properties":{
+                     "my_join_field": {
+                      "type": "join",
+                      "relations": {
+                        "artist": "album"
+                      }
+                    }
+                  }
+               }
+             }
+        }
+      """.stripMargin
+
+    val json: Json = parse(b).getOrElse(Json.Null)
+
+    val s = httpPut(uri, json)
+    httpClient.fetch(s) {
+      x =>
+        x.status match {
+          case Status.Ok =>
+            body(x)
+          case Status.Created =>
+            body(x)
+          case e =>
+            log.error(s"err $uri $e")
+            IO.raiseError(new Exception(body(x) + e.toString()))
+        }
+    }
+  }
+
 
 }

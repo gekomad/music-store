@@ -17,20 +17,21 @@
 
 package com.github.gekomad.musicstore.service.kafka
 
-import java.io
-
 import cakesolutions.kafka.KafkaConsumer
+import cats.effect.IO
 import com.github.gekomad.musicstore.service.ProductService
 import com.github.gekomad.musicstore.service.kafka.model.Avro.AvroProduct
 import com.github.gekomad.musicstore.utility.MyPredef._
-import com.github.gekomad.musicstore.utility.Properties
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.gekomad.musicstore.utility.Properties.Kafka
 import com.typesafe.config.ConfigFactory
-import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecords}
+import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecords, OffsetResetStrategy}
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.JavaConverters.mapAsJavaMap
+import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -47,116 +48,98 @@ object Consumers {
     type B
     val conf: KafkaConsumer.Conf[A, B]
     val topic: List[String]
-
   }
 
-  object KafkaConsumer1 {
+  final case class KafkaConsumer1(kafka: Kafka) extends KafkaConsumerConf {
 
-    import scala.collection.JavaConverters._
+    type A = String
+    type B = Array[Byte]
 
-    trait KafkaConsumerConf1 extends KafkaConsumerConf {
-      type A = String
-      type B = Array[Byte]
+    val conf = KafkaConsumer.Conf(
+      keyDeserializer = new StringDeserializer,
+      valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer,
+      bootstrapServers = kafka.bootstrapServers,
+      groupId = kafka.groupId,
+      enableAutoCommit = true,
+      autoOffsetReset = OffsetResetStrategy.EARLIEST
+    )
 
+    private val kafkaConsumer = KafkaConsumer(conf)
 
-    }
+    val (topic, _) = kafka.artistTopic.unzip
 
+    def consume(): Unit = {
 
-    def apply(kafka: Kafka) = new KafkaConsumerConf1 {
+      import scala.collection.JavaConverters._
 
+      def consumeMessages(records: ConsumerRecords[String, Array[Byte]]) = {
 
-      val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
-        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers,
-        ConsumerConfig.GROUP_ID_CONFIG -> kafka.groupId))),
-        keyDeserializer = new StringDeserializer,
-        valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer
-      )
-
-      val kafkaConsumer = KafkaConsumer(conf)
-
-      val (topic, _) = kafka.artistTopic.unzip
-
-      def consume: Unit = {
-
-        import scala.collection.JavaConverters._
-
-        def go(records: ConsumerRecords[String, Array[Byte]]): Future[List[io.Serializable]] = {
-
-          val read = records.asScala.map { iterator =>
-            log.debug(s"Getting message from topics ${List(topic)} .............")
-            val message = iterator.value
-            deserializeAvro[AvroProduct](message)
-          }
-
-          val v = read.flatten
-          if (v.isEmpty) Future.successful(List()) else {
-            // Thread.sleep(100)
-            ProductService.storeList(v.toList)
-          }
-
+        val read = records.asScala.map { iterator =>
+          log.debug(s"Getting message from topics ${List(topic)} .............")
+          val message = iterator.value
+          deserializeAvro[AvroProduct](message)
         }
 
-        kafkaConsumer.subscribe(topic.asJava)
+        val v = read.flatten
 
-        while (true) {
-          val records = kafkaConsumer.poll(10.seconds.toMillis)
+        if (v.isEmpty) Future(List.empty[IO[String]]) else {
 
-          go(records)
+          ProductService.storeList(v.toList)
+
         }
-
-        kafkaConsumer.close()
       }
+
+      kafkaConsumer.subscribe(topic.asJava)
+
+      while (true) {
+        val records = kafkaConsumer.poll(100.seconds.toMillis)
+        consumeMessages(records)
+      }
+
+      kafkaConsumer.close()
     }
+
   }
 
   /////////////////////////////////////////
 
+  final case class KafkaConsumerDlq(kafka: Kafka) extends KafkaConsumerConf {
 
-  object KafkaConsumerDlq {
+    type A = String
+    type B = Array[Byte]
 
-    trait KafkaConsumerConfDlq extends KafkaConsumerConf {
-      type A = String
-      type B = Array[Byte]
+    val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
+      ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers,
+      ConsumerConfig.GROUP_ID_CONFIG -> kafka.groupId))),
+      keyDeserializer = new StringDeserializer,
+      valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer
+    )
 
+    private val kafkaConsumer = KafkaConsumer(conf)
 
-    }
+    val topic = List(kafka.dlqTopic._1)
 
-    def apply(kafka: Kafka) = new KafkaConsumerConfDlq {
+    def consume(): Unit = {
 
+      import scala.collection.JavaConverters._
 
-      val conf = KafkaConsumer.Conf(ConfigFactory.parseMap(mapAsJavaMap(Map[String, AnyRef](
-        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG -> kafka.bootstrapServers,
-        ConsumerConfig.GROUP_ID_CONFIG -> kafka.groupId))),
-        keyDeserializer = new StringDeserializer,
-        valueDeserializer = new org.apache.kafka.common.serialization.ByteArrayDeserializer
-      )
+      kafkaConsumer.subscribe(topic.asJava)
 
-      val kafkaConsumer = KafkaConsumer(conf)
+      while (true) {
 
-      val topic = List(kafka.dlqTopic._1)
+        val records = kafkaConsumer.poll(10.seconds.toMillis)
 
-      def consume: Unit = {
-
-        import scala.collection.JavaConverters._
-
-        kafkaConsumer.subscribe(topic.asJava)
-
-        while (true) {
-
-          val records = kafkaConsumer.poll(10.seconds.toMillis)
-
-          val read = records.asScala.map { iterator =>
-            log.debug(s"Getting message from topics ${List(topic)} .............")
-            val message = iterator.value
-            deserializeAvro[AvroProduct](message)
-          }
-
-          val v = read.flatten
-          v.foreach(a => log.debug(s"read from dlq: ${a.theType} ${a.payload}"))
+        val read = records.asScala.map { iterator =>
+          log.debug(s"Getting message from topics ${List(topic)} .............")
+          val message = iterator.value
+          deserializeAvro[AvroProduct](message)
         }
 
-        kafkaConsumer.close()
+        val v = read.flatten
+        v.foreach(a => log.debug(s"read from dlq: ${a.theType} ${a.payload}"))
       }
+
+      kafkaConsumer.close()
     }
   }
 

@@ -21,7 +21,6 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.util.Date
-
 import com.sksamuel.avro4s._
 import io.circe.Decoder.Result
 import io.circe._
@@ -34,7 +33,7 @@ object MyPredef {
 
   implicit def localDateToTimestamp(s: LocalDate): Timestamp = new Timestamp(java.sql.Date.valueOf(s).getTime)
 
-  def now = new Timestamp(new Date().getTime)
+  def now: Timestamp = new Timestamp(new Date().getTime)
 
   implicit val timestampFormat: Encoder[Timestamp] with Decoder[Timestamp] = new Encoder[Timestamp] with Decoder[Timestamp] {
     implicit override def apply(a: Timestamp): Json = Encoder.encodeLong.apply(a.getTime)

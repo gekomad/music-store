@@ -17,185 +17,183 @@
 
 package com.github.gekomad.musicstore
 
-import java.util.UUID
-
-import cats.data.Validated.Invalid
-import com.github.gekomad.musicstore.model.json.in.AlbumPayload
-import io.circe.java8.time._
-import io.circe._
+import io.circe.syntax._
 import io.circe.generic.auto._
+import io.circe.java8.time._
+import cats.data.Validated.{Invalid, Valid}
+import com.github.gekomad.musicstore.model.json.in.AlbumPayload
+import io.circe._
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
 import com.github.gekomad.musicstore.model.json.out.{Album, Artist}
 import com.github.gekomad.musicstore.model.sql.Tables
 import com.github.gekomad.musicstore.service._
 import org.http4s.circe._
-import org.http4s.dsl.{Ok, _}
 import org.slf4j.{Logger, LoggerFactory}
-import org.http4s._
-import org.http4s.dsl._
-import io.circe.syntax._
-import slick.jdbc.meta.MTable
-
-import scala.util.{Failure, Success, Try}
-import scala.concurrent.ExecutionContext.Implicits.global
-import fs2.Task
 import com.github.gekomad.musicstore.utility.{MyRandom, Properties}
 import com.github.gekomad.musicstore.utility.MyPredef._
-import io.circe.parser.parse
-
+import cats.effect._
+import com.github.gekomad.musicstore.service.SqlService.log
+import org.http4s._
+import org.http4s.dsl.io._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import com.github.gekomad.musicstore.utility.UUIDable._
 import com.github.gekomad.musicstore.utility.UUIDableInstances._
+import scala.util.{Failure, Success, Try}
 
 object Route {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def removeNull(x: Json): String = x.pretty(Printer.spaces2.copy(dropNullKeys = true))
+  def removeNull(x: Json): String = x.pretty(Printer.spaces2.copy(dropNullValues = true))
 
-  def jsonOK(s1: Json): Task[Response] = Ok(removeNull(s1)).putHeaders(Header("Content-Type", "application/json"))
+  def jsonOK(s1: Json): IO[Response[IO]] = Ok(removeNull(s1)).map(_.putHeaders(Header("Content-Type", "application/json")))
 
-  implicit val strategy = fs2.Strategy.fromFixedDaemonPool(10)
-
-  private def upsertAlbum(req: Request, idArtist: String, idAlbum: String) = {
-    val p = req.as[String].map { json =>
-      validateArtist.validateAlbum(json) match {
-        case Invalid(ii) =>
-          val ll = ii.map { x =>
-            val p = Err(x.desc, x.field, x.code)
-            log.error(s"invalid", p)
-            p
-          }
-          BadRequest(ll.asJson)
-        case _ =>
-          val s1 = ProductService.upsertAlbum(idArtist, idAlbum, json)
-          val s = s1.map(_ => Created()).recover {
-            case f =>
-              log.error("Error", f)
+  private def upsertAlbum(req: Request[IO], idArtist: String, idAlbum: String): IO[Response[IO]] = req.as[String].flatMap { json =>
+    Validator.validateAlbum(json) match {
+      case Invalid(ii) =>
+        val ll = ii.map { x =>
+          val p = Err(x.desc, x.value, x.errorType)
+          log.error(s"invalid $p")
+          p
+        }
+        BadRequest(ll.asJson)
+      case _ =>
+        ProductService.upsertAlbum(idArtist, idAlbum, json).attempt.flatMap {
+          _.toTry match {
+            case Failure(f) => log.error("Error", f)
               BadRequest("Error " + f)
+            case Success(f) => Created()
           }
-          Task.fromFuture(s).flatMap(a => a)
-      }
+        }
     }
-    p.flatMap(a => a)
   }
 
-  private def upsertArtist(req: Request, id: String) = {
-    val p = req.as[String].map { json =>
-      validateArtist.validateArtist(json) match {
-        case Invalid(ii) =>
-          val ll = ii.map { x =>
-            val p = Err(x.desc, x.field, x.code)
-            log.error(s"invalid", p)
-            p
-          }
-          BadRequest(ll.asJson)
-        case _ =>
-          val s1 = ProductService.upsertArtist(id, json)
-          val s = s1.map(_ => Created()).recover {
-            case f =>
-              log.error("Error", f)
+
+  private def upsertArtist(req: Request[IO], id: String): IO[Response[IO]] = req.as[String].flatMap { json =>
+    val x = Validator.validateArtist(json)
+    x match {
+      case Invalid(ii) =>
+        val ll = ii.map { x =>
+          val p = Err(x.desc, x.value, x.errorType)
+          log.error(s"invalid $p")
+          p
+        }
+        BadRequest(ll.asJson)
+      case Valid(artistPayload) =>
+        ProductService.upsertArtist(id, artistPayload, json).attempt.flatMap {
+          _.toTry match {
+            case Failure(f) => log.error("Error", f)
               BadRequest("Error " + f)
+            case Success(f) => Created()
           }
-          Task.fromFuture(s).flatMap(a => a)
-      }
+        }
     }
-    p.flatMap(a => a)
   }
 
-  val service = HttpService {
+
+  def createSqlSchema: IO[Response[IO]] = {
+    val create = Tables.createSchema
+
+    val o = create.flatMap { _ =>
+      val read = Tables.loadSchema
+      read.map { _ =>
+        Ok("Create and Read schema OK")
+      }.recover { case err =>
+        log.error("Read schema error ", err)
+        InternalServerError("Error " + err.getMessage)
+      }
+    }.recover {
+      case err =>
+        log.error("Create schema ERROR", err)
+        InternalServerError("Error " + err.getMessage)
+    }
+    val p = IO.fromFuture(IO(o)).flatMap(a => a)
+    p
+  }
+
+  val service: HttpService[IO] = HttpService[IO] {
 
     case GET -> Root / "rest" / "create_sql_schema" =>
       log.debug(s"received create_sql_schema")
-
-      val l: Future[(Try[String], Try[Vector[MTable]])] = for {
-        l1 <- Tables.createSchema
-        l2 <- Tables.loadSchema
-      } yield (l1, l2)
-
-      Task.fromFuture(l).flatMap { response =>
-        val (creare, read) = (response._1, response._2)
-        creare match {
-          case Failure(x) =>
-            log.error("Create schema ERROR", x)
-            InternalServerError("Error " + x.getMessage)
-          case Success(_) =>
-            read match {
-              case Failure(xx) =>
-                log.error("Read schema error ", xx)
-                InternalServerError("Error " + xx.getMessage)
-              case Success(_) => Ok("Create and Read schema OK")
-            }
-        }
-      }
+      createSqlSchema
 
     case GET -> Root / "rest" / "artist" / id =>
       log.debug(s"received $id")
-      if (!id.isUUID) BadRequest("id is not valid")
-      else {
+      id.isUUID.fold(BadRequest("id is not valid")) { id =>
         val x: Future[Option[Tables.ArtistsType]] = ProductService.loadArtist(id)
         val o = x.map { record =>
-          record.map(x => jsonOK(Artist(x.id, x.name, x.url, x.activity).asJson)).getOrElse(NotFound(id))
+          record.fold(NotFound(id))(x => jsonOK(Artist(x.id, x.name, x.url, x.activity).asJson))
         }.recover {
           case f =>
             log.error("err", f)
             InternalServerError("Error " + f)
         }
-        Task.fromFuture(o).flatMap(a => a)
+
+        IO.fromFuture(IO(o)).flatMap(a => a)
       }
 
     case GET -> Root / "rest" / "album" / id =>
       log.debug(s"received $id")
-      if (!id.isUUID) BadRequest("id is not valid")
-      else {
+      id.isUUID.fold(BadRequest("id is not valid")) { id =>
         val x: Future[Option[Tables.AlbumsType]] = ProductService.loadAlbum(id)
         val o = x.map { record =>
-          record.map(y => jsonOK(Album(y.id, y.title, y.publishDate, y.artistId).asJson)).getOrElse(NotFound(id))
+          record.fold(NotFound(id))(y => jsonOK(Album(y.id, y.title, y.publishDate, y.artistId).asJson))
         }.recover {
           case f =>
             log.error("err", f)
             InternalServerError("Error " + f)
         }
-        Task.fromFuture(o).flatMap(a => a)
+        IO.fromFuture(IO(o)).flatMap(a => a)
       }
 
     case req@POST -> Root / "rest" / "album" / idAlbum / idArtist =>
       log.debug(s"update album $idAlbum")
-
       upsertAlbum(req, idArtist, idAlbum)
 
     case req@POST -> Root / "rest" / "artist" / id =>
       log.debug(s"update artist $id")
-
       upsertArtist(req, id)
 
     case DELETE -> Root / "rest" / "album" / id / artistId =>
       log.debug(s"delete album $id $artistId")
-      if (!id.isUUID) BadRequest(s"album id $id is not valid")
-      else if (!artistId.isUUID) BadRequest(s"artist id $artistId is not valid")
-      else
-        ProductService.deleteAlbum(id, artistId)
+      id.isUUID.fold(BadRequest(s"album id $id is not valid")) { _ =>
+        artistId.isUUID.fold(BadRequest(s"artist id $artistId is not valid")) { id =>
+          ProductService.deleteAlbum(id, id).attempt.flatMap {
+            _.toTry match {
+              case Failure(f) => BadRequest(s"album $id artist $artistId is not valid")
+              case Success(f) => Ok(id)
+            }
+          }
+        }
+      }
 
     case DELETE -> Root / "rest" / "artist" / id =>
       log.debug(s"delete artist $id")
-      if (!id.isUUID) BadRequest("id is not valid") else
-        ProductService.deleteArtist(id)
+      id.isUUID.fold(BadRequest("id is not valid")) { i =>
+        ProductService.deleteArtist(i).attempt.flatMap {
+          _.toTry match {
+            case Failure(f) => BadRequest(s"artist id $id is not valid")
+            case Success(f) => Ok(id)
+          }
+        }
+      }
 
     case req@PUT -> Root / "rest" / "artist" / id =>
       log.debug(s"create artist $id")
       // PUT is idempotent
       val p = ProductService.loadArtist(id).map { art =>
-        art.map(_ => Created("artist exists")).getOrElse(upsertArtist(req, id))
+        art.fold(upsertArtist(req, id))(_ => Created("artist exists"))
       }
-      Task.fromFuture(p).flatMap(a => a)
+      IO.fromFuture(IO(p)).flatMap(a => a)
 
     case req@PUT -> Root / "rest" / "album" / idAlbum / idArtist =>
       log.debug(s"create artist $idAlbum")
       // PUT is idempotent
       val p = ProductService.loadAlbum(idAlbum).map { art =>
-        art.map(_ => Created("album exists")).getOrElse(upsertAlbum(req, idArtist, idAlbum))
+        art.fold(upsertAlbum(req, idArtist, idAlbum))(_ => Created("album exists"))
       }
-      Task.fromFuture(p).flatMap(a => a)
+      IO.fromFuture(IO(p)).flatMap(a => a)
 
 
     case GET -> Root / "rest" / "album" / "track" / name =>
@@ -219,14 +217,14 @@ object Route {
     case GET -> Root / "admin" / "check" =>
       log.debug("received admin check")
       val elastic = Properties.elasticSearch.check
-      val kafka = Properties.kafka.map(c => c.check).getOrElse(true)
-      val err = (if (!elastic) "ELASTIC SEARCH NOT RESPONDING" else "") + (if (kafka != 0) "\nKAFKA NOT RESPONDING" else "")
+      val kafka = Properties.kafka.fold(0)(c => c.check)
+      val err = (if (!elastic) "ELASTIC SEARCH IS NOT RESPONDING" else "") + (if (kafka != 0) "\nKAFKA IS NOT RESPONDING" else "")
 
-      val k = ProductService.loadAlbum(MyRandom.getRandomUUID.toString)
-      val tr1 = k.map { _ =>
+      val k = ProductService.artistsCount
+      val tr1 = k.map { count =>
         ArtistPayload.random.asJson.hcursor.downField("name").as[String] match {
           case Right(_) =>
-            if (elastic && kafka == 0) Ok("OK") else InternalServerError(err)
+            if (elastic && kafka == 0) Ok(s"artist count: $count") else InternalServerError(err)
           case Left(f) =>
             log.error("Error $err", f)
             InternalServerError(s"$err\n$f")
@@ -236,7 +234,7 @@ object Route {
           log.error("Error $err", f)
           InternalServerError(s"$err\n$f")
       }
-      Task.fromFuture(tr1).flatMap(g => g)
+      IO.fromFuture(IO(tr1)).flatMap(g => g)
 
   }
 

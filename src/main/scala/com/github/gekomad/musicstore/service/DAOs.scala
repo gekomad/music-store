@@ -32,9 +32,16 @@ abstract class GenericDAO[TheEntity <: AbstractTable[_] with BaseEntity](val the
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  import Properties.dc.profile.api._
+  import Properties.sql.dc.profile.api._
 
-  val db: JdbcBackend#DatabaseDef = Properties.dc.db
+  val db: JdbcBackend#DatabaseDef = Properties.sql.dc.db
+
+  def count: Future[Int] = {
+    import Properties.sql.dc.profile.api._
+    val query = theTable.size.result
+    log.debug("Generated SQL for filter query: {}", query.statements.head)
+    db.run(query)
+  }
 
   def upsert(value: TheEntity#TableElementType) = {
     log.debug(s"Insert in table \nvalues: $value")
@@ -49,7 +56,7 @@ abstract class GenericDAO[TheEntity <: AbstractTable[_] with BaseEntity](val the
    */
 
   def load(key: String): Future[Option[TheEntity#TableElementType]] = {
-    import Properties.dc.profile.api._
+    import Properties.sql.dc.profile.api._
     val query = theTable.filter(_.id === key).result.headOption
     log.debug("Generated SQL for filter query: {}", query.statements.head)
     db.run(query)
@@ -64,7 +71,7 @@ abstract class GenericDAO[TheEntity <: AbstractTable[_] with BaseEntity](val the
 
 object ArtistDAO extends GenericDAO[ArtistsEntity](TableQuery[ArtistsEntity]) {
   def delete(key: String): Future[Int] = {
-    import Properties.dc.profile.api._
+    import Properties.sql.dc.profile.api._
     val action = theTable.filter(_.id === key).delete
     val affectedRowsCount: Future[Int] = db.run(action)
     affectedRowsCount
@@ -73,15 +80,15 @@ object ArtistDAO extends GenericDAO[ArtistsEntity](TableQuery[ArtistsEntity]) {
 
 object AlbumDAO extends GenericDAO[AlbumsEntity](TableQuery[AlbumsEntity]) {
 
-  def delete(key: String) = {
-    import Properties.dc.profile.api._
+  def delete(key: String): Future[Int] = {
+    import Properties.sql.dc.profile.api._
     val action = theTable.filter(_.id === key)
     val affectedRowsCount: Future[Int] = db.run(action.delete)
     affectedRowsCount
   }
 
   def artistIdByAlbumId(albumId: String): Future[Option[String]] = {
-    import Properties.dc.profile.api._
+    import Properties.sql.dc.profile.api._
     val query = theTable.filter(_.id === albumId).result.headOption
     db.run(query).map(a => a.map(b => b.artistId))
   }

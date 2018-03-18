@@ -6,58 +6,56 @@ Music Store
 ## Requisites
 
 * Scala 2.12.4
-* sbt 0.13.15
-* Slick 3.2.1
-* Http4s 0.17.6
+* Slick 3.2.2
+* Http4s 0.18.2
+* Circe 0.9.2
 * Mysql/Postgres/Oracle (for Oracle - put ojdbc6.jar in lib directory)
-* Kafka (optional - enable it in application_{db_env}.conf)
-* Elastic Search
+* Kafka 1.0.0 (optional - enable it in application_{db_env}.conf)
+* Elastic Search 6
 
 ## Install Mysql, Kafka and ElasticSearch on Docker
 
 #### Install Mysql
 
-    docker run -d --name MYSQL-http4s_slick_kafka_elastic -p 3306:3306 -e MYSQL_ROOT_PASSWORD=http4s_slick_kafka_elastic mysql
+    docker run -d --name MYSQL-music_store -p 3306:3306 -e MYSQL_ROOT_PASSWORD=music_store mysql
 
 #### Install Postgres
 
-    docker run -d --name POSTGRES-http4s_slick_kafka_elastic -p 5432:5432 -e POSTGRES_USER=http4s_slick_kafka_elastic -e POSTGRES_PASSWORD=http4s_slick_kafka_elastic postgres
-
-#### Wait a bit
-
-    sleep 50
+    docker run -d --name POSTGRES-music_store -p 5432:5432 -e POSTGRES_USER=music_store -e POSTGRES_PASSWORD=music_store postgres
 
 #### Configure Mysql
 
-
-    docker exec -i MYSQL-http4s_slick_kafka_elastic mysql -uroot -phttp4s_slick_kafka_elastic  << EOF
-    CREATE USER 'http4s_slick_kafka_elastic'@'%' IDENTIFIED BY 'http4s_slick_kafka_elastic';
-    CREATE DATABASE http4s_slick_kafka_elastic DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;
-    GRANT ALL ON http4s_slick_kafka_elastic.* TO 'http4s_slick_kafka_elastic'@'%';
+    docker exec -i MYSQL-music_store mysql -uroot -pmusic_store  << EOF
+    CREATE USER 'music_store'@'%' IDENTIFIED BY 'music_store';
+    CREATE DATABASE music_store DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;
+    GRANT ALL ON music_store.* TO 'music_store'@'%';
+    CREATE USER 'music_store_jmeter'@'%' IDENTIFIED BY 'music_store_jmeter';
+    CREATE DATABASE music_store_jmeter DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;
+    GRANT ALL ON music_store_jmeter.* TO 'music_store_jmeter'@'%';
     FLUSH PRIVILEGES;
-    EOF
+EOF
 
 #### Configure Postgres
 
-    docker exec -i POSTGRES-http4s_slick_kafka_elastic psql -U http4s_slick_kafka_elastic -c "GRANT ALL PRIVILEGES ON DATABASE http4s_slick_kafka_elastic TO http4s_slick_kafka_elastic"
+    docker exec -i POSTGRES-music_store psql -U music_store -c "GRANT ALL PRIVILEGES ON DATABASE music_store TO music_store"
 
 #### Install Elastic Search
 
-    docker run -d --name ELASTIC-http4s_slick_kafka_elastic -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:6.1.3
+    docker run -d --name ELASTIC-music_store -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:6.1.3
 
 #### Install Kafka Development Environment and web interface at http://127.0.1.1:3030
 
-    docker run -d --name KAFKA-http4s_slick_kafka_elastic -p 2181:2181 -p 3030:3030 -p 8081:8081 -p 8082:8082 -p 8083:8083 -p 9092:9092 -e ADV_HOST=127.0.0.1 landoop/fast-data-dev
+    docker run -d --name KAFKA-music_store -p 2181:2181 -p 3030:3030 -p 8081:8081 -p 8082:8082 -p 8083:8083 -p 9092:9092 -e ADV_HOST=127.0.0.1 landoop/fast-data-dev
 
 ## Run integration test
 
-    sbt test
+    ./test.sh
 
 ## Build e deploy
 
     sbt dist
 
-    ./bin/http4s-slick-kafka  -Dconfig.resource=application_{db_env}.conf
+    ./bin/music-store  -Dconfig.resource=application_{db_env}.conf
 
     replace {db_env} with H2, MYSQL or ORACLE
 
@@ -97,17 +95,7 @@ curl -v -X PUT http://localhost:9200/music -H 'Content-Type: application/json; c
 
 ## Stress test - Jmeter
 
-    jmeter -n -t jmeter/put_artist.jmx -Jgroup1threads={n-threads} -Jduration={seconds} -Jhost={host} -Jport={port}
-
-    jmeter -n -t jmeter/put_album.jmx -Jgroup1threads={n-threads} -Jduration={seconds} -Jhost={host} -Jport={port}
-
-example:
-
-    cd jmeter
-
-    rm artist_request_url.log ; jmeter -n -t put_artist.jmx -Jgroup1threads=10 -Jduration=10 -Jhost=localhost -Jport=8080
-
-    rm album_request_url.log ; jmeter -n -t put_album.jmx -Jgroup1threads=10 -Jduration=10 -Jhost=localhost -Jport=8080
+    ./test_jmeter.sh
 
 ### Operations
 

@@ -13,3 +13,4 @@ dist
 /RUNNING_PID
 /.settings
 ojdbc6.jar
+.pid

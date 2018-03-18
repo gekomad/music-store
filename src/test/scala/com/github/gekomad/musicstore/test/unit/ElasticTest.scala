@@ -17,53 +17,70 @@
 
 package com.github.gekomad.musicstore.test.unit
 
-import com.github.gekomad.musicstore.model.json.elasticsearch.Products.ElasticArtist
+import cats.effect.IO
+import com.github.gekomad.musicstore.model.json.elasticsearch.ElasticSearchTemplate
+import com.github.gekomad.musicstore.model.json.elasticsearch.Products.{ElasticAlbum, ElasticArtist}
+import com.github.gekomad.musicstore.model.sql.Tables
 import com.github.gekomad.musicstore.service.ElasticService
+import com.github.gekomad.musicstore.service.ElasticService.{httpClient, log}
 import com.github.gekomad.musicstore.utility.Net._
+import com.github.gekomad.musicstore.utility.Properties.log
 import com.github.gekomad.musicstore.utility.{MyRandom, Properties}
-import fs2.Task
-import io.circe.Json
-import org.http4s._
-import org.http4s.client.Client
-import org.http4s.client.blaze.PooledHttp1Client
-import org.http4s.dsl._
-import org.scalatest._
 import io.circe.syntax._
 import io.circe.generic.auto._
 import io.circe.java8.time._
+import io.circe.Json
+import org.http4s._
+import org.http4s.client.Client
+import org.http4s.client.blaze.{Http1Client, PooledHttp1Client}
+import org.http4s.dsl.{io, _}
+import org.scalatest._
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
-class ElasticTest extends FunSuite {
+class ElasticTest extends FunSuite with BeforeAndAfterAll {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
+
+
+  override def beforeAll(): Unit = {
+    if (!Properties.elasticSearch.check)
+      fail("ELASTICSEARCH IS NOT RESPONDING. DID YOU RUN test.sh ?")
+    else {
+      val o = ElasticService.createSchema
+      Try(Await.result(o.unsafeToFuture(), Duration.Inf)) match {
+        case Failure(f) => if (f.getMessage.contains("resource_already_exists_exception")) () else throw new Exception(f)
+        case _ =>
+      }
+    }
+  }
 
   test("WriteRead") {
 
     val product: ElasticArtist = ElasticArtist.random
     val id = MyRandom.getRandomUUID.toString
-    val index = "test_index"
+    val index = Properties.elasticSearch.index1
 
-    val p = ElasticService.insert(id, index, product)
-    p.map { x =>
-      println("put - return body: " + x)
-    }
+    val pp = ElasticService.insert(id, index, product)
+    val httpClient = Http1Client[IO]().unsafeRunSync
 
-    val pp = p.unsafeAttemptRun().toTry
-    pp match {
-      case Failure(f) => log.error("err", f)
-      case _ =>
-    }
-    assert(pp.isSuccess)
+    pp.flatMap { r =>
+      val read = ElasticService.read(index, Properties.elasticSearch.artistType, id)
+      httpClient.fetch(read) {
+        x =>
+          x.status match {
+            case Status.Ok =>
+              IO(1)
+            case e =>
+              fail(e.toString)
+              IO(1)
+          }
+      }
 
-    val read = ElasticService.read(index, Properties.elasticSearch.artistType, id)
-
-    read.map { r =>
-      log.debug("read - return body: " + body(r))
-      assert(r.status == Status.Ok)
     }
 
   }
-
 }

@@ -18,7 +18,7 @@
 package com.github.gekomad.musicstore.service
 
 /**
-  * Error managemnt
+  * Error management
   */
 
 object MyErrors {
@@ -26,6 +26,6 @@ object MyErrors {
   val DecodeJsonError = "DecodeJsonError"
 }
 
-final case class Err(desc: String, field: String, code: String)
+final case class Err(desc: String, value: String, errorType: String)
 
 

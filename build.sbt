@@ -1,29 +1,46 @@
 import sbt.Keys.libraryDependencies
 
-//sbt-native-packager
 enablePlugins(JavaServerAppPackaging)
 
 name := "music-store"
 
-version := "0.0.3-SNAPSHOT"
+version := "0.1.0-SNAPSHOT"
 organization := "com.github.gekomad"
 scalaVersion := "2.12.4"
 
-val Http4sVersion = "0.17.6"
-val circeVersion = "0.8.0"
-val slickVersion = "3.2.1"
-val kafkaVersion = "1.0.0"
+scalacOptions := Seq(
+  "-deprecation",
+  "-encoding",
+  "UTF-8",
+  "-feature",
+  "-language:existentials",
+  "-language:higherKinds",
+  "-Ypartial-unification"
+)
 
-scalacOptions := Seq("-unchecked", "-deprecation", "-feature")
+
+val http4sVersion = "0.18.2"
+val circeVersion = "0.9.2"
+val slickVersion = "3.2.2"
+val kafkaVersion = "1.0.0"
+val avroVersion = "1.8.2"
+
+val h2Version = "1.4.196"
+val logbackVersion = "1.2.3"
+val scalaTestVersion = "3.0.5"
+val scalaCheckVersion = "1.13.5"
+val scalaMeterVersion = "0.9"
+val postgresVersion = "42.2.1"
+val mysqlVersion = "6.0.6"
 
 //http4s
-libraryDependencies += "org.http4s" %% "http4s-blaze-server" % Http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-dsl" % Http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-blaze-client" % Http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-dsl" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-blaze-client" % http4sVersion
 
 //circe
 libraryDependencies += "io.circe" %% "circe-java8" % circeVersion
-libraryDependencies += "org.http4s" %% "http4s-circe" % Http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-circe" % http4sVersion
 libraryDependencies += "io.circe" %% "circe-optics" % circeVersion
 
 // Optional for auto-derivation of JSON codecs
@@ -31,7 +48,7 @@ libraryDependencies += "io.circe" %% "circe-generic" % circeVersion
 // Optional for string interpolation to JSON model
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser" % circeVersion
-
+libraryDependencies += "io.circe" %% "circe-core" % circeVersion
 //slick
 libraryDependencies += "com.typesafe.slick" %% "slick" % slickVersion
 libraryDependencies += "com.typesafe.slick" %% "slick-hikaricp" % slickVersion
@@ -42,23 +59,23 @@ libraryDependencies += "net.cakesolutions" %% "scala-kafka-client" % kafkaVersio
 resolvers += Resolver.bintrayRepo("cakesolutions", "maven")
 
 //avro
-libraryDependencies += "com.sksamuel.avro4s" %% "avro4s-core" % "1.8.0"
+libraryDependencies += "com.sksamuel.avro4s" %% "avro4s-core" % avroVersion
 
 //driver
-libraryDependencies += "com.h2database" % "h2" % "1.4.196"
-libraryDependencies += "mysql" % "mysql-connector-java" % "6.0.6"
-libraryDependencies += "org.postgresql" % "postgresql" % "42.2.1"
+libraryDependencies += "com.h2database" % "h2" % h2Version
+libraryDependencies += "mysql" % "mysql-connector-java" % mysqlVersion
+libraryDependencies += "org.postgresql" % "postgresql" % postgresVersion
 
 //log
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % logbackVersion
 
 //test
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.13.5" % "test"
-libraryDependencies += "com.storm-enroute" %% "scalameter" % "0.8.2" % "test"
-libraryDependencies += "net.cakesolutions" %% "scala-kafka-client-testkit" % "1.0.0" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
+libraryDependencies += "org.scalacheck" %% "scalacheck" % scalaCheckVersion % "test"
+libraryDependencies += "com.storm-enroute" %% "scalameter" % scalaMeterVersion % "test"
 
-testOptions += Tests.Setup(_ => sys.props("testing") = "application_INTEGRATION_TEST.conf")
+libraryDependencies += "net.cakesolutions" %% "scala-kafka-client-testkit" % kafkaVersion % "test"
+
+testOptions += Tests.Setup (_ => sys.props ("testing") = "application_IT.conf")
 parallelExecution in Test := false
-
 

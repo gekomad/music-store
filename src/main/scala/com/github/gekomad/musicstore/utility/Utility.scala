@@ -23,12 +23,9 @@ object Utility {
 
   val PATTERN_DOMAIN: Regex = """^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9]\.[^\s]{2,})$""".r
 
-  def isDomain(thedomain: String): Boolean =
-    if (thedomain == null) false else
-      PATTERN_DOMAIN.findFirstIn(thedomain) match {
-        case Some(_) => true
-        case _ => false
-      }
-
-
+  def isDomain(thedomain: String): Boolean = if (thedomain == null) false else
+    PATTERN_DOMAIN.findFirstIn(thedomain) match {
+      case Some(_) => true
+      case _ => false
+    }
 }

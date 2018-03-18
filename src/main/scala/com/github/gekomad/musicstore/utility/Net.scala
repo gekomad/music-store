@@ -18,42 +18,43 @@
 package com.github.gekomad.musicstore.utility
 
 import java.net.Socket
-
-import fs2.Task
 import io.circe.Json
-import org.http4s._
-import org.http4s.circe._
-import org.http4s.client.Client
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.util.{Failure, Success, Try}
 
 object Net {
+
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def httpGet(uri: Uri)(httpClient: Client): Task[Response] = httpClient.get(uri)(Task.now)
+  import cats.effect._
+  import org.http4s._
 
-  def httpDelete[A](uri: Uri)(httpClient: Client): Task[Response] =
-    httpClient.fetch(Request(method = Method.DELETE, uri = uri))(Task.now)
+  implicit def defaultHeader: Header = Header("Content-Type", "application/json")
 
-  def httpPut[A](uri: Uri, body: Json)(httpClient: Client, h: Header = Header("Content-Type", "application/json")): (Response => Task[A]) => Task[A] =
-    httpClient.fetch(Request(method = Method.PUT, uri = uri).putHeaders(h).withBody(body))
+  import org.http4s.dsl.io._
 
-  def httpPost[A](uri: Uri, body: Json)(httpClient: Client, h: Header = Header("Content-Type", "application/json")): (Response => Task[A]) => Task[A] =
-    httpClient.fetch(Request(method = Method.POST, uri = uri).putHeaders(h).withBody(body))
+  def httpGet[A](uri: Uri): Request[IO] = Request[IO](Method.GET, uri = uri)
 
-  def body(s: Response): String =
-    new String(s.body.runLog.unsafeRun.foldLeft(scodec.bits.ByteVector.empty)(_ :+ _).toArray)
+  def httpDelete[A](uri: Uri): Request[IO] = Request[IO](Method.DELETE, uri = uri)
 
+  import cats.effect.IO
 
-  def serverListening(host: String, port: Int): Boolean = {
-    val p = Try {
-      new Socket(host, port)
-    }.map(_.close)
+  import org.http4s.{Method, Request, Uri}
+  import org.http4s.circe._
 
-    p match {
-      case Success(_) => true
-      case Failure(_) => false
-    }
+  def httpPut[A](uri: Uri, body: Json)(implicit h: Header): IO[Request[IO]] = Request[IO](Method.PUT, uri = uri).withBody(body).
+    map(_.putHeaders(h))
+
+  def httpPost[A](uri: Uri, body: Json)(implicit h: Header): IO[Request[IO]] = Request[IO](Method.POST, uri = uri).withBody(body).
+    map(_.putHeaders(h))
+
+  def body(res: Response[IO]): IO[String] = res.body.compile.toVector.map(_.map(_.toChar).mkString)
+
+  def serverListening(host: String, port: Int): Boolean = Try {
+    new Socket(host, port)
+  }.map(_.close) match {
+    case Success(_) => true
+    case Failure(_) => false
   }
+
 }

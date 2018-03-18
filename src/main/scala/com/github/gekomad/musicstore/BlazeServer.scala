@@ -17,22 +17,17 @@
 
 package com.github.gekomad.musicstore
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import cats.effect.IO
+import fs2.{Stream, StreamApp}
 import com.github.gekomad.musicstore.utility.Properties
-import fs2.{Stream, Task}
+import fs2.StreamApp.ExitCode
 import org.http4s.server.blaze._
-import org.http4s.util.StreamApp
-import org.slf4j.{Logger, LoggerFactory}
-import scala.util.Properties.envOrNone
 
-object BlazeHttpServer extends StreamApp {
-  val log: Logger = LoggerFactory.getLogger(this.getClass)
+object BlazeServer extends StreamApp[IO] {
 
-  override def stream(args: List[String]): Stream[Task, Nothing] =
-    BlazeBuilder
-      .bindHttp(Properties.httpPort, Properties.host)
-      .mountService(Route.service)
-      .serve
+  override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] = Services.blazeServer.serve
 
-  StartupServices
-
+  Services.startServices
 }

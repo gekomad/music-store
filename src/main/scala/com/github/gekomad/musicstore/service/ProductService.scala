@@ -17,49 +17,33 @@
 
 package com.github.gekomad.musicstore.service
 
-
 import com.github.gekomad.musicstore.model.json.elasticsearch.Products.{ElasticAlbum, ElasticArtist}
 import com.github.gekomad.musicstore.model.json.in.AlbumPayload
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
 import com.github.gekomad.musicstore.model.sql.Tables
-import com.github.gekomad.musicstore.service
-import com.github.gekomad.musicstore.service.AlbumDAO.artistIdByAlbumId
 import com.github.gekomad.musicstore.service.kafka.Producers
-import com.github.gekomad.musicstore.service.kafka.model.Avro.{AvroAlbum, AvroArtist, AvroPayload, AvroProduct}
+import com.github.gekomad.musicstore.service.kafka.model.Avro.{AvroAlbum, AvroArtist, AvroProduct}
 import com.github.gekomad.musicstore.utility.Properties
-import fs2.Task
 import io.circe.Json
-import org.http4s.Response
-import org.http4s.dsl.Ok
+import org.http4s.Status
 import org.slf4j.{Logger, LoggerFactory}
-import io.circe.parser.parse
-import io.circe.syntax._
-import java.time.LocalDate
-
-import io.circe.Decoder.Result
-import io.circe.parser.parse
 import io.circe.generic.auto._
 import io.circe.java8.time._
-import io.circe.syntax._
-import java.time.LocalDate
-
 import com.github.gekomad.musicstore.service.kafka.model.Avro
-import io.circe.Decoder.Result
 import io.circe.parser.parse
 import io.circe.generic.auto._
-import io.circe.java8.time._
-import java.io
-
+import cakesolutions.kafka.KafkaProducer
+import cats.effect.IO
+import com.github.gekomad.musicstore.service.kafka.Producers.KafkaProducer1
+import org.apache.kafka.clients.producer.RecordMetadata
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 object ProductService {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-  lazy val kafkaProducer = Properties.kafka.map(kafka => Producers.KafkaProducer1(kafka))
-
-  implicit val strategy = fs2.Strategy.fromFixedDaemonPool(10)
+  lazy val kafkaProducer = Properties.kafka.map(Producers.KafkaProducer1(_))
 
   def searchTrack(name: String) = ElasticService.searchTrack(name)()
 
@@ -69,133 +53,139 @@ object ProductService {
 
   def loadAlbum(id: String): Future[Option[Tables.AlbumsType]] = AlbumDAO.load(id)
 
-  def storeList(avroList: List[AvroProduct]) = {
-    log.debug("storeList")
+  def artistsCount: Future[Int] = ArtistDAO.count
 
-    val a = avroList.map { avro =>
-      val payload = avro.payload
+  def serialiseFutures[A, B](l: Iterable[A])(fn: A => Future[B]): Future[List[B]] =
+    l.foldLeft(Future(List.empty[B])) {
+      (previousFuture, next) =>
+        for {
+          previousResults <- previousFuture
+          next <- fn(next)
+        } yield previousResults :+ next
+    }
 
-      val json: Json = parse(payload).getOrElse(throw new Exception(s"parse error $payload"))
-      avro.theType match {
+  def insertAvro(avro: AvroProduct): IO[String] = {
 
-        case Avro.upsertArtist =>
+    val payload = avro.payload
 
-          val avroArtist = json.as[AvroArtist]
+    lazy val json: Json = parse(payload).getOrElse(throw new Exception(s"parse error $payload"))
+    avro.theType match {
 
-          avroArtist match {
-            case Left(f) =>
-              log.error(s"error decode avroArtist $json", f)
-              throw f
-            case Right(s) =>
-              val j = parse(s.payload).getOrElse(throw new Exception(s"parse error $payload"))
-              val ob = j.as[ArtistPayload].getOrElse(throw new Exception(s"parse error $payload"))
+      case Avro.upsertArtist =>
 
-              val o = upsertArtist(s.id, ob)
-              o.map {
-                ss =>
-                  log.debug(s"ok created in db ${s.id}")
-                  ss
-              }.recover {
-                case f =>
-                  log.error(s"error to create in db id $json Insert in kafka dlq", f)
+        val avroArtist = json.as[AvroArtist]
+
+        avroArtist match {
+          case Left(f) =>
+            log.error(s"error decode avroArtist $json", f)
+            IO(f.toString)
+          case Right(s) =>
+            val j = parse(s.payload).getOrElse(throw new Exception(s"parse error $payload"))
+            val ob = j.as[ArtistPayload].getOrElse(throw new Exception(s"parse error $payload"))
+
+            upsertArtist(s.id, ob).attempt.flatMap {
+              _.toTry match {
+                case Failure(f) => log.error(s"error to store in db id $json Insert in kafka dlq", f)
                   Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.id, payload))
-                  f
+                  IO.raiseError(new Exception(f.toString))
+                case Success(ss) => log.debug(s"ok stored in db ${s.id}")
+                  IO(ss)
               }
-          }
+            }
+        }
 
-        case Avro.upsertAlbum =>
+      case Avro.upsertAlbum =>
 
-          val avroAlbum = json.as[AvroAlbum]
+        val avroAlbum = json.as[AvroAlbum]
 
-          avroAlbum match {
-            case Left(f) =>
-              log.error(s"error decode avroArtist $json", f)
-              throw f
-            case Right(s) =>
-              val j = parse(s.payload.payload).getOrElse(throw new Exception(s"parse error $payload"))
-              val ob = j.as[AlbumPayload].getOrElse(throw new Exception(s"parse error $payload"))
+        avroAlbum match {
+          case Left(f) =>
+            log.error(s"error decode avroArtist $json", f)
+            IO(f.toString)
+          case Right(s) =>
+            val j = parse(s.payload.payload).getOrElse(throw new Exception(s"parse error $payload"))
+            val ob = j.as[AlbumPayload].getOrElse(throw new Exception(s"parse error $payload"))
 
-              val o = upsertAlbum(s.payload.id, s.idAlbum, ob)
-              o.map {
-                ss =>
-                  log.debug(s"ok created in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum}")
-                  ss
-              }.recover {
-                case f =>
-                  log.error(s"error to create in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum}. Insert in kafka dlq", f)
+            upsertAlbum(s.payload.id, s.idAlbum, ob).attempt.flatMap {
+              _.toTry match {
+                case Failure(f) => log.error(s"error to store in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum}. Insert in kafka dlq", f)
                   Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.idAlbum, payload))
-                  f
+                  IO.raiseError(new Exception(f.toString))
+                case Success(ss) => log.debug(s"ok stored in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum}")
+                  IO(ss)
               }
-          }
-
-      }
+            }
+        }
     }
-    val p = Future.sequence(a)
-    p
+
   }
 
-  def upsertArtist(id: String, payload: ArtistPayload): Future[io.Serializable] = {
+  def insertAvroFuture(avro: AvroProduct): Future[IO[String]] = Future(insertAvro(avro))
 
+  def storeList(avroList: List[AvroProduct]): Future[Iterator[List[IO[String]]]] = {
+    log.debug(s"storeList size: ${avroList.size}")
+
+    val s = avroList.sliding(Properties.sql.maxParallelUpsert).map(list => serialiseFutures(list)(insertAvroFuture(_)))
+
+    Future.sequence(s)
+
+  }
+
+
+  def upsertArtist(id: String, artist: ArtistPayload, json: String): IO[String] = {
+    log.debug(s"update artist $id $json")
+    kafkaProducer.map { f =>
+      val o = f.upsertArtist(id, json).map(_.mkString("|"))
+      IO.fromFuture(IO(o))
+    }.getOrElse {
+      upsertArtist(id, artist)
+    }
+  }
+
+  def upsertArtist(id: String, payload: ArtistPayload): IO[String] = {
     log.debug(s"upsertArtist artist $id")
-
     val p1: Future[Int] = SqlService.upsertArtist(id, payload)
-
-    p1.flatMap { _ =>
-      ElasticService.insert[ElasticArtist](id, Properties.elasticSearch.index1, ElasticArtist(payload)).unsafeRunAsyncFuture()
+    val o = p1.map { _ =>
+      ElasticService.insert[ElasticArtist](id, Properties.elasticSearch.index1, ElasticArtist(payload))
     }
-
+    IO.fromFuture(IO(o)).flatMap(a => a)
   }
 
-  def upsertAlbum(idArtist: String, id: String, payload: AlbumPayload): Future[io.Serializable] = {
-
+  def upsertAlbum(idArtist: String, id: String, payload: AlbumPayload): IO[String] = {
     log.debug(s"upsertArtist album $id")
-
-    val p1: Future[Int] = SqlService.upsertAlbum(id, idArtist, payload)
-
-    p1.flatMap { _ =>
-      ElasticService.insert[ElasticAlbum](id, Properties.elasticSearch.index1, ElasticAlbum(idArtist, payload)).unsafeRunAsyncFuture()
+    val o = SqlService.upsertAlbum(id, idArtist, payload).map { _ =>
+      ElasticService.insert[ElasticAlbum](id, Properties.elasticSearch.index1, ElasticAlbum(idArtist, payload))
     }
+    IO.fromFuture(IO(o)).flatMap(a => a)
 
   }
 
-  def deleteArtist(id: String) = {
-    val deleteArtistAndAlbumFromNOSQL = ElasticService.deleteArtistAndAlbums(Properties.elasticSearch.index1, Properties.elasticSearch.artistType, id)
-
-    val deleteArtistAndAlbumFromSQL = ArtistDAO.delete(id).map(a => Response(Ok))
-
-    Task.fromFuture(deleteArtistAndAlbumFromSQL).flatMap(_ => deleteArtistAndAlbumFromNOSQL)
+  def deleteArtist(id: String): IO[String] = {
+    lazy val deleteArtistAndAlbumFromNOSQL = ElasticService.deleteArtistAndAlbums(Properties.elasticSearch.index1, Properties.elasticSearch.artistType, id)
+    val deleteArtistAndAlbumFromSQL = ArtistDAO.delete(id).map(_ => Status.Ok)
+    val o = deleteArtistAndAlbumFromSQL.map(_ => deleteArtistAndAlbumFromNOSQL)
+    IO.fromFuture(IO(o)).flatMap(a => a)
   }
 
-  def deleteAlbum(id: String, artistId: String): Task[Response] = {
-    val o = AlbumDAO.delete(id)
-    val p = o.map { _ =>
+  def deleteAlbum(id: String, artistId: String): IO[String] = { //TODO add test
+    val o = AlbumDAO.delete(id).map { _ =>
       ElasticService.deleteAlbum(Properties.elasticSearch.index1, Properties.elasticSearch.albumType, id, artistId)
     }
-    Task.fromFuture(p).flatMap(a => a)
+    IO.fromFuture(IO(o)).flatMap(a => a)
   }
 
-  def upsertArtist(id: String, json: String): Future[java.io.Serializable] = {
-
-    log.debug(s"update artist $json")
-    val artistTry = ArtistPayload(json)
-
-    artistTry match {
-      case Failure(f) => throw new Exception(f)
-      case Success(artist) => kafkaProducer.map(_.upsertArtist(id, json)).getOrElse(upsertArtist(id, artist))
-
-    }
-
-  }
-
-  def upsertAlbum(idArtist: String, idAlbum: String, json: String): Future[java.io.Serializable] = {
-
+  def upsertAlbum(idArtist: String, idAlbum: String, json: String): IO[String] = {
     log.debug(s"insert album $json")
     val albumTry = AlbumPayload(json)
-
     albumTry match {
       case Failure(f) =>
         throw new Exception(f)
-      case Success(album) => kafkaProducer.map(_.upsertAlbum(idArtist, idAlbum, json)).getOrElse(upsertAlbum(idArtist, idAlbum, album))
+      case Success(album) => kafkaProducer.fold {
+        upsertAlbum(idArtist, idAlbum, album)
+      } { a =>
+        val o = a.upsertAlbum(idArtist, idAlbum, json).map(_.mkString("|")).map(IO(_))
+        IO.fromFuture(IO(o)).flatMap(a => a)
+      }
     }
   }
 

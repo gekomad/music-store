@@ -18,47 +18,45 @@
 package com.github.gekomad.musicstore.test.integration
 
 import io.circe.generic.auto._
-import io.circe.java8.time._
-import io.circe.parser.decode
 import io.circe.syntax._
-import com.github.gekomad.musicstore.{BlazeHttpServer, Route, StartupServices}
+import com.github.gekomad.musicstore.{Route, Services}
 import com.github.gekomad.musicstore.test.integration.Common._
 import com.github.gekomad.musicstore.utility.MyRandom._
-import com.github.gekomad.musicstore.utility.{Log, Properties}
+import com.github.gekomad.musicstore.utility.{ForkJoinCommon, Log, Net, Properties}
 import org.http4s._
 import org.http4s.client.blaze._
-import org.http4s.client.Client
-import org.http4s.dsl._
-import org.http4s.server.Server
-import org.http4s.server.blaze.BlazeBuilder
 import org.scalameter.{Key, Warmer, config}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.slf4j.{Logger, LoggerFactory}
 import java.util.concurrent._
-
+import cats.effect.IO
 import ch.qos.logback.classic.Level
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
-import com.github.gekomad.musicstore.utility.ForkJoinCommon
 import com.github.gekomad.musicstore.utility.Net.httpPut
-import fs2.Task
+import Net.defaultHeader
 
 class ScalaMeter extends FunSuite with BeforeAndAfterAll {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  val blazerServer: Server = BlazeBuilder
-    .bindHttp(Properties.httpPort, Properties.host)
-    .mountService(Route.service, "/")
-    .run
+  private val httpClient = Http1Client[IO]().unsafeRunSync
+
+  val server = Services.blazeServer.start.unsafeRunSync()
 
   override def beforeAll(): Unit = {
-    val o = createSchema.unsafeRun().status
-    assert(o == Ok, "error in create schema")
-    StartupServices
+
+    val s = Route.createSqlSchema.flatMap { xx =>
+      xx.status match {
+        case Status.Ok => IO("already exists")
+        case _ => Net.body(xx)
+      }
+    } unsafeRunSync()
+
+    assert(s.contains("already exists"))
   }
 
   override def afterAll(): Unit = {
-    blazerServer.shutdownNow()
+    server.shutdown.unsafeRunSync()
   }
 
   test("shutdown") {}
@@ -66,27 +64,28 @@ class ScalaMeter extends FunSuite with BeforeAndAfterAll {
   ignore("scalaMeter") {
 
     def go(x: Int): Unit = {
+      log.info(s"thread #$x")
       val publishEventObject = ArtistPayload.random
       val json = publishEventObject.asJson
 
       val uuid = getRandomUUID.toString
       val insertUrl: Uri = TEST_SERVER_URL.withPath(ARTIST_PATH) / uuid
-      val httpClient: Client = PooledHttp1Client()
 
-      val o = httpPut(insertUrl, json)(httpClient) {
-        case Created(_) =>
-          Task.now(true)
-        case e =>
-          log.error(s"sendJsonNoContent $insertUrl $json", e)
-          Task.now(false)
-      }
-      assert(o.unsafeRun())
+      val wr = httpClient.fetch(httpPut(insertUrl, json)) { x =>
+        x.status match {
+          case Status.Created =>
 
-      val l = httpClient.expect[String](TEST_SERVER_URL.withPath(ARTIST_PATH) / uuid).unsafeRun
+            val get = httpClient.expect[String](TEST_SERVER_URL.withPath(ARTIST_PATH) / uuid)
 
-      assert(l.contains(uuid.toString))
+            IO(get.map(_.contains(uuid.toString)))
 
-      httpClient.shutdownNow()
+          case e =>
+            log.error(s"sendJsonNoContent $insertUrl $json", e)
+            fail()
+        }
+      }.unsafeRunSync().unsafeRunSync()
+      assert(wr)
+
     }
 
     val levels = Log.bkAndsetLogLevels(Level.ERROR, List(this.getClass.getCanonicalName))

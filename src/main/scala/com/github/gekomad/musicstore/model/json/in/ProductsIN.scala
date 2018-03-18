@@ -69,7 +69,7 @@ object ProductBase {
 
   object ArtistPayload {
 
-    def apply(json: String): Try[ArtistPayload] = parse(json).toTry.map(_.as[ArtistPayload].toTry).flatten
+//    def apply(json: String): Try[ArtistPayload] = parse(json).toTry.map(_.as[ArtistPayload].toTry).flatten
 
     def random: ArtistPayload = {
       val name = getRandomString(10)
