@@ -20,10 +20,6 @@ package com.github.gekomad.musicstore.utility
 import java.sql.Timestamp
 import java.time.LocalDate
 import java.util.UUID
-
-
-
-import scala.collection.immutable
 import scala.util.Random
 
 object MyRandom {

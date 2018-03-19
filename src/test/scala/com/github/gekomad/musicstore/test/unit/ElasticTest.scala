@@ -18,28 +18,17 @@
 package com.github.gekomad.musicstore.test.unit
 
 import cats.effect.IO
-import com.github.gekomad.musicstore.model.json.elasticsearch.ElasticSearchTemplate
-import com.github.gekomad.musicstore.model.json.elasticsearch.Products.{ElasticAlbum, ElasticArtist}
-import com.github.gekomad.musicstore.model.sql.Tables
+import com.github.gekomad.musicstore.model.json.elasticsearch.Products.ElasticArtist
 import com.github.gekomad.musicstore.service.ElasticService
-import com.github.gekomad.musicstore.service.ElasticService.{httpClient, log}
-import com.github.gekomad.musicstore.utility.Net._
-import com.github.gekomad.musicstore.utility.Properties.log
 import com.github.gekomad.musicstore.utility.{MyRandom, Properties}
-import io.circe.syntax._
-import io.circe.generic.auto._
 import io.circe.java8.time._
-import io.circe.Json
 import org.http4s._
-import org.http4s.client.Client
-import org.http4s.client.blaze.{Http1Client, PooledHttp1Client}
-import org.http4s.dsl.{io, _}
+import org.http4s.client.blaze.Http1Client
 import org.scalatest._
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 class ElasticTest extends FunSuite with BeforeAndAfterAll {
 

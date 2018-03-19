@@ -18,11 +18,8 @@
 package com.github.gekomad.musicstore.model.json.elasticsearch
 
 import java.time.LocalDate
-
-import com.github.gekomad.musicstore.model.json.elasticsearch.Products.MyJoinField
-import com.github.gekomad.musicstore.model.json.in.{AlbumPayload, ProductBase}
+import com.github.gekomad.musicstore.model.json.in.AlbumPayload
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
-import com.github.gekomad.musicstore.utility.MyPredef._
 import com.github.gekomad.musicstore.utility.MyRandom._
 
 class ElasticProductBase

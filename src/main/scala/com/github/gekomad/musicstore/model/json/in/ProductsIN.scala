@@ -19,7 +19,6 @@ package com.github.gekomad.musicstore.model.json.in
 
 import java.time.LocalDate
 import com.github.gekomad.musicstore.utility.MyRandom._
-import io.circe.Decoder.Result
 import io.circe.parser.parse
 import io.circe.generic.auto._
 import io.circe.java8.time._

@@ -4,9 +4,9 @@ enablePlugins(JavaServerAppPackaging)
 
 name := "music-store"
 
-version := "0.1.0-SNAPSHOT"
+version := "0.2.0"
 organization := "com.github.gekomad"
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.5"
 
 scalacOptions := Seq(
   "-deprecation",
@@ -21,7 +21,7 @@ scalacOptions := Seq(
 
 val http4sVersion = "0.18.2"
 val circeVersion = "0.9.2"
-val slickVersion = "3.2.2"
+val slickVersion = "3.2.3"
 val kafkaVersion = "1.0.0"
 val avroVersion = "1.8.2"
 
@@ -30,7 +30,7 @@ val logbackVersion = "1.2.3"
 val scalaTestVersion = "3.0.5"
 val scalaCheckVersion = "1.13.5"
 val scalaMeterVersion = "0.9"
-val postgresVersion = "42.2.1"
+val postgresVersion = "42.2.2"
 val mysqlVersion = "6.0.6"
 
 //http4s

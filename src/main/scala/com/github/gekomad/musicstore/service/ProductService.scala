@@ -27,15 +27,11 @@ import com.github.gekomad.musicstore.utility.Properties
 import io.circe.Json
 import org.http4s.Status
 import org.slf4j.{Logger, LoggerFactory}
-import io.circe.generic.auto._
 import io.circe.java8.time._
 import com.github.gekomad.musicstore.service.kafka.model.Avro
 import io.circe.parser.parse
 import io.circe.generic.auto._
-import cakesolutions.kafka.KafkaProducer
 import cats.effect.IO
-import com.github.gekomad.musicstore.service.kafka.Producers.KafkaProducer1
-import org.apache.kafka.clients.producer.RecordMetadata
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -78,7 +74,7 @@ object ProductService {
         avroArtist match {
           case Left(f) =>
             log.error(s"error decode avroArtist $json", f)
-            IO(f.toString)
+            IO.pure(f.toString)
           case Right(s) =>
             val j = parse(s.payload).getOrElse(throw new Exception(s"parse error $payload"))
             val ob = j.as[ArtistPayload].getOrElse(throw new Exception(s"parse error $payload"))
@@ -89,7 +85,7 @@ object ProductService {
                   Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.id, payload))
                   IO.raiseError(new Exception(f.toString))
                 case Success(ss) => log.debug(s"ok stored in db ${s.id}")
-                  IO(ss)
+                  IO.pure(ss)
               }
             }
         }
@@ -101,7 +97,7 @@ object ProductService {
         avroAlbum match {
           case Left(f) =>
             log.error(s"error decode avroArtist $json", f)
-            IO(f.toString)
+            IO.pure(f.toString)
           case Right(s) =>
             val j = parse(s.payload.payload).getOrElse(throw new Exception(s"parse error $payload"))
             val ob = j.as[AlbumPayload].getOrElse(throw new Exception(s"parse error $payload"))
@@ -112,7 +108,7 @@ object ProductService {
                   Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.idAlbum, payload))
                   IO.raiseError(new Exception(f.toString))
                 case Success(ss) => log.debug(s"ok stored in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum}")
-                  IO(ss)
+                  IO.pure(ss)
               }
             }
         }
@@ -122,12 +118,20 @@ object ProductService {
 
   def insertAvroFuture(avro: AvroProduct): Future[IO[String]] = Future(insertAvro(avro))
 
-  def storeList(avroList: List[AvroProduct]): Future[Iterator[List[IO[String]]]] = {
+  def storeList(avroList: List[AvroProduct]): Future[Vector[List[IO[String]]]] = {
+
+    import cats.Monoid
+    import scala.concurrent.Future
+    import cats.instances.future._
+    import cats.instances.vector._
+
+    import cats.syntax.traverse._
+    import scala.concurrent.ExecutionContext.Implicits.global
+
     log.debug(s"storeList size: ${avroList.size}")
 
-    val s = avroList.sliding(Properties.sql.maxParallelUpsert).map(list => serialiseFutures(list)(insertAvroFuture(_)))
-
-    Future.sequence(s)
+    val s: Future[Vector[List[IO[String]]]] = avroList.sliding(Properties.sql.maxParallelUpsert).toVector.traverse(list => serialiseFutures(list)(insertAvroFuture(_)))
+    s
 
   }
 

@@ -24,7 +24,7 @@ import io.circe.parser.decode
 import io.circe.syntax._
 import com.github.gekomad.musicstore.utility.Net.{body, _}
 import com.github.gekomad.musicstore.{Route, Services}
-import com.github.gekomad.musicstore.test.integration.Common.{log, _}
+import com.github.gekomad.musicstore.test.integration.Common._
 import com.github.gekomad.musicstore.utility.MyRandom._
 import com.github.gekomad.musicstore.utility.Properties
 import cats.effect.IO
@@ -36,7 +36,6 @@ import org.http4s.{dsl, _}
 import org.http4s.client.blaze._
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 import org.slf4j.{Logger, LoggerFactory}
-
 
 class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
 

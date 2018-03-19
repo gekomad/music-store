@@ -21,9 +21,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
 import fs2.{Stream, StreamApp}
-import com.github.gekomad.musicstore.utility.Properties
 import fs2.StreamApp.ExitCode
-import org.http4s.server.blaze._
 
 object BlazeServer extends StreamApp[IO] {
 

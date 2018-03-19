@@ -24,11 +24,9 @@ import com.github.gekomad.musicstore.utility.MyRandom
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.slf4j.{Logger, LoggerFactory}
 import com.github.gekomad.musicstore.utility._
-
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
-import scala.util.{Failure, Success, Try}
 
 class DBtest extends FunSuite with BeforeAndAfterAll {
 

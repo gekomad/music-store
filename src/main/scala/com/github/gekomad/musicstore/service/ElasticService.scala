@@ -94,7 +94,7 @@ object ElasticService {
             case Status.Ok | Status.Created =>
               body(x)
             case e =>
-              log.error(s"err $uriPut $e")
+              log.error(s"putElastic artist err $uriPut $e")
               IO.raiseError(new Exception(e.toString))
           }
       }
