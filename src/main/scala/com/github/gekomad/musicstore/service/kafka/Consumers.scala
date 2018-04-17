@@ -22,16 +22,13 @@ import cats.effect.IO
 import com.github.gekomad.musicstore.service.ProductService
 import com.github.gekomad.musicstore.service.kafka.model.Avro.AvroProduct
 import com.github.gekomad.musicstore.utility.MyPredef._
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.gekomad.musicstore.utility.Properties.Kafka
 import com.typesafe.config.ConfigFactory
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecords, OffsetResetStrategy}
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.collection.JavaConverters.mapAsJavaMap
-import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -82,18 +79,16 @@ object Consumers {
 
         val v = read.flatten
 
-        if (v.isEmpty) Future(List.empty[IO[String]]) else {
-
-          ProductService.storeList(v.toList)
-
-        }
+        ProductService.storeList(v.toList)
       }
 
       kafkaConsumer.subscribe(topic.asJava)
 
       while (true) {
         val records = kafkaConsumer.poll(100.seconds.toMillis)
-        consumeMessages(records)
+        consumeMessages(records).recover { case f =>
+          log.error("err", f)
+        }
       }
 
       kafkaConsumer.close()

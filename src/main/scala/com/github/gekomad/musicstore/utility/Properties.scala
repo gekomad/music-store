@@ -75,7 +75,7 @@ object Properties {
 
   final case class ElasticSearch(host: Uri, index1: String, artistType: String, albumType: String) {
     def check: Boolean = if (!serverListening(host.host.get.value, host.port.getOrElse(throw new Exception))) {
-      log.error("ELASTIC SEARCH IS NOT RESPONDING")
+      log.error(s"ELASTIC SEARCH IS NOT RESPONDING $host")
       false
     } else true
   }

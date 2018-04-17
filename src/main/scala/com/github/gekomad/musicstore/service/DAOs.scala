@@ -18,14 +18,11 @@
 package com.github.gekomad.musicstore.service
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
 import com.github.gekomad.musicstore.model.sql.Tables.{AlbumsEntity, ArtistsEntity, BaseEntity}
-import com.github.gekomad.musicstore.service.AlbumDAO.theTable
 import com.github.gekomad.musicstore.utility.Properties
 import org.slf4j.{Logger, LoggerFactory}
 import slick.jdbc.JdbcBackend
 import slick.lifted.{AbstractTable, TableQuery}
-
 import scala.concurrent.Future
 
 abstract class GenericDAO[TheEntity <: AbstractTable[_] with BaseEntity](val theTable: TableQuery[TheEntity]) {

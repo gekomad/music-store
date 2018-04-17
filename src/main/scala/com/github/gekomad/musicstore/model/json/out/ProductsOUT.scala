@@ -19,7 +19,6 @@ package com.github.gekomad.musicstore.model.json.out
 
 import java.sql.Timestamp
 
-
 final case class Artist(id: String, name: String, url: Option[String], activity: Boolean)
 
 final case class Album(id: String, title: String, publishDate: Timestamp, artistId: String)

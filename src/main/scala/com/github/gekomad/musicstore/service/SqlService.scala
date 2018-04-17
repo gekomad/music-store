@@ -17,17 +17,13 @@
 
 package com.github.gekomad.musicstore.service
 
-import com.github.gekomad.musicstore.Route.log
 import com.github.gekomad.musicstore.model.json.in.AlbumPayload
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
-import com.github.gekomad.musicstore.model.sql.Tables
 import com.github.gekomad.musicstore.model.sql.Tables.{AlbumsType, ArtistsType}
 import com.github.gekomad.musicstore.utility.MyPredef._
 import com.github.gekomad.musicstore.utility.Properties.sql.dc._
 import com.github.gekomad.musicstore.utility.Properties.sql.dc.profile.api._
-import org.http4s.dsl.io.{InternalServerError, Ok}
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.concurrent.Future
 
 object SqlService {

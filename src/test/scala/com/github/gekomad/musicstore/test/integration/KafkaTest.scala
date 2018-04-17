@@ -18,14 +18,12 @@
 package com.github.gekomad.musicstore.test.integration
 
 import java.util.UUID
-
 import cakesolutions.kafka.{KafkaConsumer, KafkaProducer}
 import org.apache.kafka.clients.consumer.OffsetResetStrategy
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.slf4j.{Logger, LoggerFactory}
-
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

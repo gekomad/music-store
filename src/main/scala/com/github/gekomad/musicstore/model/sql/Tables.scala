@@ -18,13 +18,13 @@
 package com.github.gekomad.musicstore.model.sql
 
 import java.sql.Timestamp
-
 import com.github.gekomad.musicstore.utility.MyPredef._
-import com.github.gekomad.musicstore.utility.MyRandom.{getRandomBoolean, getRandomInt, getRandomString, getRandomUrl, _}
+import com.github.gekomad.musicstore.utility.MyRandom.{getRandomBoolean, getRandomString, getRandomUrl, _}
 import com.github.gekomad.musicstore.utility.Properties
 import org.slf4j.{Logger, LoggerFactory}
 import slick.jdbc.meta.MTable
 import slick.sql.SqlProfile.ColumnOption.SqlType
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 

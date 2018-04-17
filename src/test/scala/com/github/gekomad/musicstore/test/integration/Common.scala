@@ -17,12 +17,10 @@
 
 package com.github.gekomad.musicstore.test.integration
 
-
 import com.github.gekomad.musicstore.utility.Net._
 import org.slf4j.{Logger, LoggerFactory}
 import com.github.gekomad.musicstore.utility.Properties
 import org.http4s._
-
 
 object Common {
 
