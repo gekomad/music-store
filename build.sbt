@@ -6,7 +6,7 @@ name := "music-store"
 
 version := "0.2.0"
 organization := "com.github.gekomad"
-scalaVersion := "2.12.5"
+scalaVersion := "2.12.6"
 
 scalacOptions := Seq(
   "-deprecation",

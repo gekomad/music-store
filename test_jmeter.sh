@@ -12,7 +12,7 @@ if [ "$command" == "" ]
     printf "${RED}your user must be in docker group${NC}\n"
     printf "use:\n"
     printf "$0 start\n"
-    printf "$0 run n_thread duration_seconds\n"
+    printf "$0 run n_thread seconds\n"
     printf "$0 stop\n"
     exit 1
 fi
@@ -21,6 +21,8 @@ http_port=8282
 docker_image_elastic="JMETER_ELASTIC"
 docker_image_kafka="JMETER_KAFKA"
 docker_image_postgres="JMETER_POSTGRES"
+elastic_port=9233
+postgres_port=5432
 
 check_http_code() {
 	echo $(curl -s -o /dev/null -w "%{http_code}" $1)
@@ -31,7 +33,7 @@ ok() {
 }
 
 start_elastic(){
-    elastic_port=9233
+   
 
     echo "starting docker image $docker_image_elastic..."
     docker run -d --rm --name $docker_image_elastic -p $elastic_port:9200 -p 5633:5601 nshou/elasticsearch-kibana
@@ -61,10 +63,14 @@ start_elastic(){
                     "artist": "album"
                   }
                 },
-              "title" : { "type" : "text", "fields" : {"raw" : {"type":"keyword"} } }
-               }
+              "title" : { "type" : "text", "fields" : {"raw" : {"type":"keyword"} } },
+              "publishDate": {
+              "type":   "date",
+              "format": "yyyy-MM-dd"
+              }
+            }
            }
-         }
+        }
     }' >/dev/null 2>/dev/null
 }
 
@@ -76,7 +82,7 @@ start_kafka(){
 start_postgres()
 {
     echo "starting docker image $docker_image_postgres..."
-    docker run -d --name $docker_image_postgres -p 5432:5432 -e POSTGRES_USER=music_store -e POSTGRES_PASSWORD=music_store postgres
+    docker run -d --name $docker_image_postgres -p $postgres_port:5432 -e POSTGRES_USER=music_store -e POSTGRES_PASSWORD=music_store postgres
 }
 
 create_sql_schema()
@@ -112,7 +118,7 @@ run_jmeter()
 {
     cd jmeter
 
-    dur=$((($duration / 2)+1))
+    dur=$((($seconds / 2)+1))
 
     rm artist_request_url.log  album_request_url.log jmeter.log 2>/dev/null
 
@@ -164,17 +170,19 @@ if [ "$command" == "start" ]
     printf "${BLUE}starting music_store...${NC}"
     start_app
     ok
-    printf "${GREEN}Next step $0 run n_thread duration_seconds${NC}\n"
+    printf "Elastic search responds on port $elastic_port \n"
+    printf "Postgres responds on port $postgres_port \n"
+    printf "${GREEN}Next step $0 run n_thread seconds_seconds${NC}\n"
 fi
 
 if [ "$command" == "run" ]
   then
   export n_thread=$2
-  export duration=$3
-  if [ "$duration" == "" ]
+  export seconds=$3
+  if [ "$seconds" == "" ]
     then
-      printf "${RED}your user must be in docker group${NC}\n"
-      echo "use: $0 n_thread duration_seconds"
+      printf "${BLUE}your user must be in docker group${NC}\n"
+      echo "use: $0 n_thread seconds"
       exit 1
   fi
   run_jmeter

@@ -201,6 +201,12 @@ object Route {
       val s1 = ProductService.searchTrack(name)
       s1.flatMap(a => jsonOK(a.asJson))
 
+    //Get albums avg length by artist_id
+    case GET -> Root / "rest" / "aggregations" / "artist" / "album" / "length" / "avg" / artistId =>
+      log.debug(s"received get albums avg length for $artistId")
+      val s1 = ProductService.albumsAvgDuration(artistId)
+      s1.flatMap(a => jsonOK(a))
+
     case GET -> Root / "rest" / "artist" / "name" / name =>
       log.debug(s"received search artist by name")
       val s1 = ProductService.searchArtistByname(name)
@@ -229,11 +235,12 @@ object Route {
             log.error("Error $err", f)
             InternalServerError(s"$err\n$f")
         }
-      }.recover {
-        case f =>
-          log.error("Error $err", f)
-          InternalServerError(s"$err\n$f")
       }
+        .recover {
+          case f =>
+            log.error("Error $err", f)
+            InternalServerError(s"$err\n$f")
+        }
       IO.fromFuture(IO(tr1)).flatMap(g => g)
 
   }

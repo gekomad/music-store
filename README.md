@@ -74,20 +74,24 @@ EOF
 ```
 curl -v -X PUT http://localhost:9200/music -H 'Content-Type: application/json; charset=utf-8' -d'
 {
-    "mappings": {
-       "doc":{
-          "properties":{
-             "my_join_field": {
-              "type": "join",
-              "relations": {
-                "artist": "album"
+        "mappings": {
+           "doc":{
+              "properties":{
+                 "my_join_field": {
+                  "type": "join",
+                  "relations": {
+                    "artist": "album"
+                  }
+                },
+              "title" : { "type" : "text", "fields" : {"raw" : {"type":"keyword"} } },
+              "publishDate": {
+              "type":   "date",
+              "format": "yyyy-MM-dd"
               }
-            },
-          "title" : { "type" : "text", "fields" : {"raw" : {"type":"keyword"} } }
+            }
            }
-       }
-     }
-}'
+        }
+    }'
 ```
 
 ## Stress test - Jmeter
@@ -127,7 +131,7 @@ curl -v -X PUT http://localhost:8080/rest/album/00000000-0001-47d7-8c55-398030b2
 {
   "title" : "Killers",
   "publishDate" : "1980-02-02",
-  "duration" : 2298,
+  "length" : 2298,
   "price" : 20.22,
   "tracks": ["The Ides of March", "Wrathchild", "Murders in the Rue Morgue", "Another Life", "Genghis Khan", "Innocent Exile", "Killers", "Prodigal Son", "Purgatory", "Drifter"],
   "quantity" : 70,
@@ -144,7 +148,7 @@ curl -v -X PUT http://localhost:8080/rest/album/00000000-0002-47d7-8c55-398030b2
 {
   "title" : "The Number of the Beast",
   "publishDate" : "1982-03-22",
-  "duration" : 2351,
+  "length" : 2351,
   "price" : 21.14,
   "tracks": ["Invaders","Children of the Damned","The Prisoner","22 Acacia Avenue","The Number of the Beast","Run to the Hills","Gangland","Hallowed Be Thy Name"],
   "quantity" : 100,
@@ -185,7 +189,7 @@ curl -v -X POST http://localhost:8080/rest/album/00000000-0002-47d7-8c55-398030b
 {
   "title" : "The Number of the Beast",
   "publishDate" : "1982-03-22",
-  "duration" : 2351,
+  "length" : 2351,
   "price" : 21.14,
   "tracks": ["Invaders","Children of the Damned","The Prisoner","22 Acacia Avenue","The Number of the Beast","Run to the Hills","Gangland","Hallowed Be Thy Name"],
   "quantity" : 100,
@@ -203,6 +207,10 @@ curl -v -X POST http://localhost:8080/rest/album/00000000-0002-47d7-8c55-398030b
 
     curl http://localhost:8080/rest/album/00000000-0002-47d7-8c55-398030b2ab4f
 
+#### Get albums avg length by artist_id
+
+    curl http://localhost:8080/rest/aggregations/artist/album/length/avg/00000000-0002-47d7-8c55-398030b2ab4f
+
 #### Delete album
 
     curl -v -X DELETE http://localhost:8080/rest/album/00000000-0002-47d7-8c55-398030b2ab4f/00000000-0000-47d7-8c55-398030b2ab4f
@@ -212,3 +220,37 @@ curl -v -X POST http://localhost:8080/rest/album/00000000-0002-47d7-8c55-398030b
 
     curl -v -X DELETE http://localhost:8080/rest/artist/00000000-0000-47d7-8c55-398030b2ab4f
 
+#### Histogram by artist year
+
+```
+curl -v -X POST localhost:9200/music/_search?size=0 -H 'Content-Type: application/json; charset=utf-8' -d'
+{
+
+   "aggs":{
+      "release":{
+         "histogram":{
+            "field":"year",
+            "interval" :10
+         }
+      }
+   }
+}'
+ ```
+
+ #### Histogram by album publication year
+
+ ```
+ curl -v -X POST localhost:9200/music/_search?size=0 -H 'Content-Type: application/json; charset=utf-8' -d'
+ {
+    "aggs":{
+       "events_last_week_histogram":{
+          "date_histogram":{
+          	 "min_doc_count": 0,
+             "field":"publishDate",
+             "format": "yyyy-MM-dd",
+             "interval" :"year"
+          }
+       }
+    }
+ }'
+ ```

@@ -43,6 +43,18 @@ object ProductService {
 
   def searchTrack(name: String) = ElasticService.searchTrack(name)()
 
+  def albumsAvgDuration(artistId: String) = {
+
+    import io.circe.generic.auto._
+    import io.circe.syntax._
+
+    case class Avg(value: Double)
+    val o = ElasticService.albumsAvgDuration(artistId)()
+
+    o.map(c => Avg(c).asJson)
+
+  }
+
   def searchArtistByname(name: String) = ElasticService.searchArtistByName(name)()
 
   def loadArtist(id: String): Future[Option[Tables.ArtistsType]] = ArtistDAO.load(id)

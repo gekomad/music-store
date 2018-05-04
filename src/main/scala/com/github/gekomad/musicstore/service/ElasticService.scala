@@ -20,7 +20,7 @@ package com.github.gekomad.musicstore.service
 import io.circe.parser.parse
 import io.circe.generic.auto._
 import io.circe.java8.time._
-import com.github.gekomad.musicstore.model.json.elasticsearch.{ElasticProductBase, ElasticSearchTemplate}
+import com.github.gekomad.musicstore.model.json.elasticsearch._
 import com.github.gekomad.musicstore.model.json.elasticsearch.Products.{ElasticAlbum, ElasticArtist}
 import com.github.gekomad.musicstore.utility.Net.{body, _}
 import com.github.gekomad.musicstore.utility.Properties
@@ -31,9 +31,11 @@ import org.slf4j.{Logger, LoggerFactory}
 import cats.effect.IO
 import org.http4s.client.Client
 import org.http4s.client.blaze._
+
 import scala.collection.immutable
 
 object ElasticService {
+
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
   private val httpClient: Client[IO] = Http1Client[IO]().unsafeRunSync
@@ -44,6 +46,51 @@ object ElasticService {
   def routing(index: String, theType: String, childId: String, parentId: String): Uri = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$childId?routing=$parentId""")
 
   def byId(index: String, theType: String, id: String): Uri = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$id""")
+
+  def albumsAvgDuration(artistId: String)(index: String = Properties.elasticSearch.index1) = {
+    val query =
+      s""" {
+      "query":{
+        "match_phrase":{
+      	  "_routing": "$artistId"
+        }
+      },
+      "aggs":{
+        "avg_rating":{
+         "avg":{
+            "field":"length"
+           }
+        }
+      }
+    }"""
+
+
+    val queryJson: Json = parse(query).getOrElse(throw new Exception(s"err parse $query"))
+
+    val uri = Properties.elasticSearch.host.withPath(s"""/$index/_search?size=0""")
+
+    val s: IO[Request[IO]] = httpPost(uri, queryJson)
+
+    httpClient.fetch(s) {
+      x =>
+        x.status match {
+          case Status.Ok =>
+            body(x).map { ss =>
+              val o = parse(ss).getOrElse(Json.Null)
+              val p1 = o.as[Aggregations1]
+              val p = p1.map { a =>
+                a.aggregations.avg_rating.value
+              }
+              val o1= p.getOrElse(throw new Exception(s"err decode $p"))
+              o1
+            }
+          case e =>
+            log.error(s"err $e")
+            IO.raiseError(new Exception(e.toString))
+        }
+    }
+
+  }
 
   def searchArtistByName(name: String)(index: String = Properties.elasticSearch.index1) = {
     val uri = Properties.elasticSearch.host.withPath(s"""/$index/$artistType/_search?q=name:$name""")

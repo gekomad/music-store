@@ -62,7 +62,7 @@ object Products {
   final case class ElasticAlbum(
                                  title: String,
                                  publishDate: LocalDate,
-                                 duration: Int,
+                                 length: Int,
                                  tracks: List[String],
                                  my_join_field: MyJoinField
                                ) extends ElasticProductBase
@@ -70,16 +70,16 @@ object Products {
   object ElasticAlbum {
 
     def apply(idArtist: String, album: AlbumPayload): ElasticAlbum =
-      new ElasticAlbum( album.title, album.publishDate, album.duration, album.tracks, MyJoinField("album", idArtist))
+      new ElasticAlbum( album.title, album.publishDate, album.length, album.tracks, MyJoinField("album", idArtist))
 
 
     def random: ElasticAlbum = {
       val title = getRandomString(10)
       val publishDate = getRandomLocalDate
-      val duration = getRandomInt(100, 2000)
+      val length = getRandomInt(100, 2000)
       val tracks = getRandomStringList(3, 10)
       val idArtist = getRandomUUID.toString
-      ElasticAlbum( title, publishDate, duration, tracks, MyJoinField("album", idArtist))
+      ElasticAlbum( title, publishDate, length, tracks, MyJoinField("album", idArtist))
     }
 
   }

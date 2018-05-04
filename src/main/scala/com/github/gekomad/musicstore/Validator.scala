@@ -98,7 +98,7 @@ object Validator {
 
     val title = fieldIsValid[String](cursor, "title")(!isBlank(_))
     val publishDate = fieldIsValid[LocalDate](cursor, "publishDate")()
-    val duration = fieldIsValid[Int](cursor, "duration")(_ != 0)
+    val length = fieldIsValid[Int](cursor, "length")(_ != 0)
     val price = fieldIsValid[Float](cursor, "price")()
     val tracks = fieldIsValid[List[String]](cursor, "tracks")()
     val quantity = fieldIsValid[Int](cursor, "quantity")()
@@ -109,7 +109,7 @@ object Validator {
     val album = (
       title.toValidated,
       publishDate.toValidated,
-      duration.toValidated,
+      length.toValidated,
       price.toValidated,
       tracks.toValidated,
       quantity.toValidated,
