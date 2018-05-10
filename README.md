@@ -43,32 +43,6 @@ EOF
 
     docker run -d --name KAFKA-music_store -p 2181:2181 -p 3030:3030 -p 8081:8081 -p 8082:8082 -p 8083:8083 -p 9092:9092 -e ADV_HOST=127.0.0.1 landoop/fast-data-dev
 
-## Run integration test
-
-    ./test.sh
-
-## Build e deploy
-
-    sbt dist
-
-    ./bin/music-store  -Dconfig.resource=application_{db_env}.conf
-
-    replace {db_env} with H2, MYSQL, ORACLE or POSTGRES
-
-## Check
-
-    curl -v http://localhost:8080/admin/check
-
-    returns 200 OK
-
-## Run with sbt
-
-    sbt -Dconfig.resource=application_{db_env}.conf run
-
-## Create sql schema
-
-    curl -v http://localhost:8080/rest/create_sql_schema
-
 ## Elastic Search mapping artist/album
 
 ```
@@ -93,6 +67,33 @@ curl -v -X PUT http://localhost:9200/music -H 'Content-Type: application/json; c
         }
     }'
 ```
+
+## Run integration test
+
+    ./test.sh
+
+## Build e deploy
+
+    sbt dist
+
+    ./bin/music-store  -Dconfig.resource=application_{db_env}.conf
+
+    replace {db_env} with H2, MYSQL, ORACLE
+
+## Check
+
+    curl -v http://localhost:8080/admin/check
+
+    returns 200 OK
+
+## Run with sbt
+
+    sbt -Dconfig.resource=application_{db_env}.conf run
+
+## Create sql schema
+
+    curl -v http://localhost:8080/rest/create_sql_schema
+
 
 ## Stress test - Jmeter
 

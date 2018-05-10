@@ -66,7 +66,6 @@ object Consumers {
     val (topic, _) = kafka.artistTopic.unzip
 
     def consume(): Unit = {
-
       import scala.collection.JavaConverters._
 
       def consumeMessages(records: ConsumerRecords[String, Array[Byte]]) = {
@@ -86,9 +85,16 @@ object Consumers {
 
       while (true) {
         val records = kafkaConsumer.poll(100.seconds.toMillis)
-        consumeMessages(records).recover { case f =>
+        consumeMessages(records).map {
+          _.foreach {
+            _.foreach {
+              _.unsafeToFuture()
+            }
+          }
+        }.recover { case f =>
           log.error("err", f)
         }
+
       }
 
       kafkaConsumer.close()

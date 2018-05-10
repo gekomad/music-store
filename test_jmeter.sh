@@ -23,6 +23,7 @@ docker_image_kafka="JMETER_KAFKA"
 docker_image_postgres="JMETER_POSTGRES"
 elastic_port=9233
 postgres_port=5432
+kibana_port=5633
 
 check_http_code() {
 	echo $(curl -s -o /dev/null -w "%{http_code}" $1)
@@ -36,7 +37,7 @@ start_elastic(){
    
 
     echo "starting docker image $docker_image_elastic..."
-    docker run -d --rm --name $docker_image_elastic -p $elastic_port:9200 -p 5633:5601 nshou/elasticsearch-kibana
+    docker run -d --rm --name $docker_image_elastic -p $elastic_port:9200 -p $kibana_port:5601 nshou/elasticsearch-kibana
 
     COUNTER=0
     while [[  $COUNTER -lt 15 && $(check_http_code http://localhost:$elastic_port) -ne "200" ]]; do
@@ -126,8 +127,12 @@ run_jmeter()
     jmeter -n -t put_album.jmx -Jgroup1threads=$n_thread -Jduration=$dur -Jhost=localhost -Jport=$http_port >album.log
 
     echo
+    printf "${BLUE} -- ARTIST LOG -- ${NC}\n"
     cat artist.log
+    echo
+    printf "${BLUE} -- ALBUM LOG -- ${NC}\n"
     cat album.log
+    echo
     echo
     printf "${GREEN}Dont't forget to stop ($0 stop)${NC}\n"
 }
@@ -171,6 +176,7 @@ if [ "$command" == "start" ]
     start_app
     ok
     printf "Elastic search responds on port $elastic_port \n"
+    printf "Kibana responds on port $kibana_port \n"
     printf "Postgres responds on port $postgres_port \n"
     printf "${GREEN}Next step $0 run n_thread seconds_seconds${NC}\n"
 fi

@@ -33,7 +33,7 @@
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
                 <stringProp name="Argument.value">{&#xd;
-  &quot;title&quot; : &quot;${__RandomString(10,abcdefg1234567890)}&quot;,&#xd;
+  &quot;title&quot; : &quot;${__RandomString(3,abcdefg1234567890)}&quot;,&#xd;
   &quot;publishDate&quot; : &quot;${__RandomString(4,123456789)}-03-22&quot;,&#xd;
   &quot;length&quot; : ${__Random(1,5000)},&#xd;
   &quot;price&quot; : ${__Random(1,30)}.${__Random(1,99)},&#xd;
