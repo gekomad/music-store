@@ -52,7 +52,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
     o.map { a =>
       a.status match {
         case Status.Ok =>
-        case e => fail()
+        case _ => fail()
       }
     }
   }
@@ -161,7 +161,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
     }
   }
 
-  test("Insert duration = 0 returns BadRequest") {
+  test("Insert length = 0 returns BadRequest") {
     val artistId = getRandomUUID.toString
 
     //insert artist
@@ -190,7 +190,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
     {
 
       val insertUrl: Uri = TEST_SERVER_URL.withPath(ALBUM_PATH) / artistId / albumId
-      val albumObject = AlbumPayload.random.copy(duration = 0)
+      val albumObject = AlbumPayload.random.copy(length = 0)
       val workaround: Json = albumObject.asJson
       val s = httpPut(insertUrl, workaround)
       val d = httpClient.fetch(s) { x =>

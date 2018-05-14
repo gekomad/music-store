@@ -86,7 +86,13 @@ object Consumers {
 
       while (true) {
         val records = kafkaConsumer.poll(100.seconds.toMillis)
-        consumeMessages(records).recover { case f =>
+        consumeMessages(records).map {
+          _.foreach {
+            _.foreach {
+              _.unsafeToFuture()
+            }
+          }
+        }.recover { case f =>
           log.error("err", f)
         }
       }

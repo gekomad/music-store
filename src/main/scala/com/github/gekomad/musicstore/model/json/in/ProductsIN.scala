@@ -27,7 +27,7 @@ import scala.util.Try
 final case class AlbumPayload(
                                title: String,
                                publishDate: LocalDate,
-                               duration: Int,
+                               length: Int,
                                price: Float,
                                tracks: List[String],
                                quantity: Int,

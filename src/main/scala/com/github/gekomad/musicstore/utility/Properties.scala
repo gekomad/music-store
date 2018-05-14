@@ -60,7 +60,7 @@ object Properties {
 
       val p = artistTopic.map(_.split(":"))
 
-      require(p.foldLeft(true)((a, b) => a && b.length == 2))
+      require(p.forall(_.length == 2))
 
       val d = dlqTopic.split(":")
       require(d.size == 2)

@@ -40,9 +40,17 @@ final case class Shards(
                          failed: Int
                        )
 
+trait ElasticSearchTrait[A] {
+  val took: Int
+  val timed_out: Boolean
+  val _shards: Shards
+  val hits: MainHits[A]
+}
+
+
 final case class ElasticSearchTemplate[A](
                                            took: Int,
                                            timed_out: Boolean,
                                            _shards: Shards,
-                                           hits: MainHits[A]
-                                         )
+                                           hits: MainHits[A])
+  extends ElasticSearchTrait[A]

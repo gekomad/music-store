@@ -30,7 +30,7 @@ object Services {
 
   def blazeServer = BlazeBuilder[IO].bindHttp(Properties.httpPort, Properties.host).mountService(Route.service, "/")
 
-  def startServices = {
+  def startServices() = {
     Properties.kafka.fold(log.info("Kafka is disabled")) { kafkaConf =>
 
       log.info("Kafka is enabled")

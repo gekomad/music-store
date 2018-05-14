@@ -63,7 +63,7 @@ object Route {
           _.toTry match {
             case Failure(f) => log.error("Error", f)
               BadRequest("Error " + f)
-            case Success(f) => Created()
+            case Success(_) => Created()
           }
         }
     }
@@ -85,7 +85,7 @@ object Route {
           _.toTry match {
             case Failure(f) => log.error("Error", f)
               BadRequest("Error " + f)
-            case Success(f) => Created()
+            case Success(_) => Created()
           }
         }
     }
@@ -161,8 +161,8 @@ object Route {
         artistId.isUUID.fold(BadRequest(s"artist id $artistId is not valid")) { id =>
           ProductService.deleteAlbum(id, id).attempt.flatMap {
             _.toTry match {
-              case Failure(f) => BadRequest(s"album $id artist $artistId is not valid")
-              case Success(f) => Ok(id)
+              case Failure(_) => BadRequest(s"album $id artist $artistId is not valid")
+              case Success(_) => Ok(id)
             }
           }
         }
@@ -173,8 +173,8 @@ object Route {
       id.isUUID.fold(BadRequest("id is not valid")) { i =>
         ProductService.deleteArtist(i).attempt.flatMap {
           _.toTry match {
-            case Failure(f) => BadRequest(s"artist id $id is not valid")
-            case Success(f) => Ok(id)
+            case Failure(_) => BadRequest(s"artist id $id is not valid")
+            case Success(_) => Ok(id)
           }
         }
       }
@@ -200,6 +200,12 @@ object Route {
       log.debug(s"received search album by track")
       val s1 = ProductService.searchTrack(name)
       s1.flatMap(a => jsonOK(a.asJson))
+
+    //Get albums avg length by artist_id
+    case GET -> Root / "rest" / "aggregations" / "artist" / "album" / "length" / "avg" / artistId =>
+      log.debug(s"received get albums avg length for $artistId")
+      val s1 = ProductService.albumsAvgDuration(artistId)
+      s1.flatMap(a => jsonOK(a))
 
     case GET -> Root / "rest" / "artist" / "name" / name =>
       log.debug(s"received search artist by name")
@@ -229,11 +235,12 @@ object Route {
             log.error("Error $err", f)
             InternalServerError(s"$err\n$f")
         }
-      }.recover {
-        case f =>
-          log.error("Error $err", f)
-          InternalServerError(s"$err\n$f")
       }
+        .recover {
+          case f =>
+            log.error("Error $err", f)
+            InternalServerError(s"$err\n$f")
+        }
       IO.fromFuture(IO(tr1)).flatMap(g => g)
 
   }

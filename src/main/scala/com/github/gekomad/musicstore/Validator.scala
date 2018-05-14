@@ -60,7 +60,7 @@ object Validator {
   def validateArtist(json: String): FailSlow[ArtistPayload] = {
     log.debug(s"validateArtist: $json")
 
-    def isDomainOption(o: Option[String]): Boolean = o.fold(true)(isDomain(_))
+    def isDomainOption(o: Option[String]): Boolean = o.fold(true)(isDomain)
 
     val doc: Json = parse(json).getOrElse(Json.Null)
     val cursor: HCursor = doc.hcursor
@@ -71,7 +71,7 @@ object Validator {
 
     val year = fieldIsValid[Int](cursor, "year")()
     val members = fieldIsValid[List[String]](cursor, "members")()
-    val url = fieldIsValid[Option[String]](cursor, "url")(isDomainOption(_))
+    val url = fieldIsValid[Option[String]](cursor, "url")(isDomainOption)
     val activity = fieldIsValid[Boolean](cursor, "activity")()
     val description = fieldIsValid[Option[String]](cursor, "description")()
 
@@ -98,7 +98,7 @@ object Validator {
 
     val title = fieldIsValid[String](cursor, "title")(!isBlank(_))
     val publishDate = fieldIsValid[LocalDate](cursor, "publishDate")()
-    val duration = fieldIsValid[Int](cursor, "duration")(_ != 0)
+    val length = fieldIsValid[Int](cursor, "length")(_ != 0)
     val price = fieldIsValid[Float](cursor, "price")()
     val tracks = fieldIsValid[List[String]](cursor, "tracks")()
     val quantity = fieldIsValid[Int](cursor, "quantity")()
@@ -109,7 +109,7 @@ object Validator {
     val album = (
       title.toValidated,
       publishDate.toValidated,
-      duration.toValidated,
+      length.toValidated,
       price.toValidated,
       tracks.toValidated,
       quantity.toValidated,

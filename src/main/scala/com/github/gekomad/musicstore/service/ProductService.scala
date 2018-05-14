@@ -43,6 +43,18 @@ object ProductService {
 
   def searchTrack(name: String) = ElasticService.searchTrack(name)()
 
+  def albumsAvgDuration(artistId: String) = {
+
+    import io.circe.generic.auto._
+    import io.circe.syntax._
+
+    case class Avg(value: Double)
+    val o = ElasticService.albumsAvgDuration(artistId)()
+
+    o.map(c => Avg(c).asJson)
+
+  }
+
   def searchArtistByname(name: String) = ElasticService.searchArtistByName(name)()
 
   def loadArtist(id: String): Future[Option[Tables.ArtistsType]] = ArtistDAO.load(id)
@@ -74,7 +86,7 @@ object ProductService {
         avroArtist match {
           case Left(f) =>
             log.error(s"error decode avroArtist $json", f)
-            IO.pure(f.toString)
+            IO(f.toString)
           case Right(s) =>
             val j = parse(s.payload).getOrElse(throw new Exception(s"parse error $payload"))
             val ob = j.as[ArtistPayload].getOrElse(throw new Exception(s"parse error $payload"))
@@ -85,7 +97,7 @@ object ProductService {
                   Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.id, payload))
                   IO.raiseError(new Exception(f.toString))
                 case Success(ss) => log.debug(s"ok stored in db ${s.id}")
-                  IO.pure(ss)
+                  IO(ss)
               }
             }
         }
@@ -97,7 +109,7 @@ object ProductService {
         avroAlbum match {
           case Left(f) =>
             log.error(s"error decode avroArtist $json", f)
-            IO.pure(f.toString)
+            IO(f.toString)
           case Right(s) =>
             val j = parse(s.payload.payload).getOrElse(throw new Exception(s"parse error $payload"))
             val ob = j.as[AlbumPayload].getOrElse(throw new Exception(s"parse error $payload"))
@@ -108,7 +120,7 @@ object ProductService {
                   Properties.kafka.map(kafka => Producers.KafkaProducerDlq(kafka).upsertArtist(s.idAlbum, payload))
                   IO.raiseError(new Exception(f.toString))
                 case Success(ss) => log.debug(s"ok stored in db idArtist: ${s.payload.id} idAlbum: ${s.idAlbum}")
-                  IO.pure(ss)
+                  IO(ss)
               }
             }
         }
@@ -130,14 +142,13 @@ object ProductService {
 
     log.debug(s"storeList size: ${avroList.size}")
 
-    val s: Future[Vector[List[IO[String]]]] = avroList.sliding(Properties.sql.maxParallelUpsert).toVector.traverse(list => serialiseFutures(list)(insertAvroFuture(_)))
-    s
+    avroList.sliding(Properties.sql.maxParallelUpsert).toVector.traverse(list => serialiseFutures(list)(insertAvroFuture))
 
   }
 
 
   def upsertArtist(id: String, artist: ArtistPayload, json: String): IO[String] = {
-    log.debug(s"update artist $id $json")
+    log.debug(s"upsertArtist artist $id $json")
     kafkaProducer.map { f =>
       val o = f.upsertArtist(id, json).map(_.mkString("|"))
       IO.fromFuture(IO(o))
@@ -146,13 +157,11 @@ object ProductService {
     }
   }
 
-  def upsertArtist(id: String, payload: ArtistPayload): IO[String] = {
+  private def upsertArtist(id: String, payload: ArtistPayload): IO[String] = {
     log.debug(s"upsertArtist artist $id")
-    val p1: Future[Int] = SqlService.upsertArtist(id, payload)
-    val o = p1.map { _ =>
+    IO.fromFuture(IO(SqlService.upsertArtist(id, payload))).map { _ =>
       ElasticService.insert[ElasticArtist](id, Properties.elasticSearch.index1, ElasticArtist(payload))
-    }
-    IO.fromFuture(IO(o)).flatMap(a => a)
+    }.flatMap(a => a)
   }
 
   def upsertAlbum(idArtist: String, id: String, payload: AlbumPayload): IO[String] = {
