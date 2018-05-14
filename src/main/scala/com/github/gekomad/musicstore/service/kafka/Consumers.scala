@@ -66,6 +66,7 @@ object Consumers {
     val (topic, _) = kafka.artistTopic.unzip
 
     def consume(): Unit = {
+
       import scala.collection.JavaConverters._
 
       def consumeMessages(records: ConsumerRecords[String, Array[Byte]]) = {
@@ -94,7 +95,6 @@ object Consumers {
         }.recover { case f =>
           log.error("err", f)
         }
-
       }
 
       kafkaConsumer.close()

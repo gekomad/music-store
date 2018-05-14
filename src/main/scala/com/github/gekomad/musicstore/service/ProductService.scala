@@ -142,8 +142,7 @@ object ProductService {
 
     log.debug(s"storeList size: ${avroList.size}")
 
-    val s: Future[Vector[List[IO[String]]]] = avroList.sliding(Properties.sql.maxParallelUpsert).toVector.traverse(list => serialiseFutures(list)(insertAvroFuture(_)))
-    s
+    avroList.sliding(Properties.sql.maxParallelUpsert).toVector.traverse(list => serialiseFutures(list)(insertAvroFuture))
 
   }
 

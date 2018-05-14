@@ -40,7 +40,7 @@ class DBtest extends FunSuite with BeforeAndAfterAll {
     assert(Properties.sql.dc.profile.toString.contains("H2Profile"), "db is not H2Profile")
     val o = db.run(Tables.allTablesSchema.drop)
     o.map(a => a).recover {
-      case x@s if (x.toString.contains("""Table "ALBUMS" not found""")) => ()
+      case x@_ if x.toString.contains("""Table "ALBUMS" not found""") => ()
     }
   }
 

@@ -5,10 +5,10 @@ Music Store
 
 ## Requisites
 
-* Scala 2.12.5
+* Scala 2.12.6
 * Slick 3.2.3
-* Http4s 0.18.2
-* Circe 0.9.2
+* Http4s 0.18.11
+* Circe 0.9.3
 * Mysql/Postgres/Oracle (for Oracle - put ojdbc6.jar in lib directory)
 * Kafka 1.0.0 (optional - enable it in application_{db_env}.conf)
 * Elastic Search 6

@@ -63,7 +63,7 @@ object Route {
           _.toTry match {
             case Failure(f) => log.error("Error", f)
               BadRequest("Error " + f)
-            case Success(f) => Created()
+            case Success(_) => Created()
           }
         }
     }
@@ -85,7 +85,7 @@ object Route {
           _.toTry match {
             case Failure(f) => log.error("Error", f)
               BadRequest("Error " + f)
-            case Success(f) => Created()
+            case Success(_) => Created()
           }
         }
     }
@@ -161,8 +161,8 @@ object Route {
         artistId.isUUID.fold(BadRequest(s"artist id $artistId is not valid")) { id =>
           ProductService.deleteAlbum(id, id).attempt.flatMap {
             _.toTry match {
-              case Failure(f) => BadRequest(s"album $id artist $artistId is not valid")
-              case Success(f) => Ok(id)
+              case Failure(_) => BadRequest(s"album $id artist $artistId is not valid")
+              case Success(_) => Ok(id)
             }
           }
         }
@@ -173,8 +173,8 @@ object Route {
       id.isUUID.fold(BadRequest("id is not valid")) { i =>
         ProductService.deleteArtist(i).attempt.flatMap {
           _.toTry match {
-            case Failure(f) => BadRequest(s"artist id $id is not valid")
-            case Success(f) => Ok(id)
+            case Failure(_) => BadRequest(s"artist id $id is not valid")
+            case Success(_) => Ok(id)
           }
         }
       }

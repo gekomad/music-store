@@ -60,7 +60,7 @@ object Validator {
   def validateArtist(json: String): FailSlow[ArtistPayload] = {
     log.debug(s"validateArtist: $json")
 
-    def isDomainOption(o: Option[String]): Boolean = o.fold(true)(isDomain(_))
+    def isDomainOption(o: Option[String]): Boolean = o.fold(true)(isDomain)
 
     val doc: Json = parse(json).getOrElse(Json.Null)
     val cursor: HCursor = doc.hcursor
@@ -71,7 +71,7 @@ object Validator {
 
     val year = fieldIsValid[Int](cursor, "year")()
     val members = fieldIsValid[List[String]](cursor, "members")()
-    val url = fieldIsValid[Option[String]](cursor, "url")(isDomainOption(_))
+    val url = fieldIsValid[Option[String]](cursor, "url")(isDomainOption)
     val activity = fieldIsValid[Boolean](cursor, "activity")()
     val description = fieldIsValid[Option[String]](cursor, "description")()
 

@@ -52,7 +52,7 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
     o.map { a =>
       a.status match {
         case Status.Ok =>
-        case e => fail()
+        case _ => fail()
       }
     }
   }
