@@ -22,7 +22,7 @@ scalacOptions := Seq(
 val http4sVersion = "0.18.11"
 val circeVersion = "0.10.0"
 val slickVersion = "3.2.3"
-val kafkaVersion = "2.0.0"
+val kafkaVersion = "1.0.0"
 val avroVersion = "1.9.0"
 
 val h2Version = "1.4.197"
