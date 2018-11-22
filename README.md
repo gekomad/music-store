@@ -259,10 +259,19 @@ curl -v -X POST localhost:9200/music/_search?size=0 -H 'Content-Type: applicatio
 #### Bump version
 
  ```
-git flow release start {next_version}
+NEXT_VERSION="{next_version}"
+git flow release start $NEXT_VERSION
 bumpversion minor|major|patch
-git commit -a -m"{next_version}"
-git flow release finish {next_version}
+bumped_version=$(grep current_version .bumpversion.cfg |awk -F "= " '{print $2}')
+if [ "$bumped_version" != "$NEXT_VERSION" ]; then
+    echo "error versions mismatch $bumped_version $NEXT_VERSION"
+    exit 1
+fi
+sed -r -i 's/^version := "(\b[0-9]{1,3}\.){2}[0-9]{1,3}\b"$'/"version := \"$NEXT_VERSION\""/ build.sbt
+
+git commit -a -m "v.$NEXT_VERSION"
+git flow release finish $NEXT_VERSION
 git push --all
 git push origin --tags
+
  ```
