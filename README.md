@@ -5,12 +5,12 @@ Music Store
 
 ## Requisites
 
-* Scala 2.12.6
+* Scala 2.12.7
 * Slick 3.2.3
 * Http4s 0.18.11
-* Circe 0.9.3
+* Circe 0.10.0
 * Mysql/Postgres/Oracle (for Oracle - put ojdbc6.jar in lib directory)
-* Kafka 1.0.0 (optional - enable it in application_{db_env}.conf)
+* Kafka 2.0.0 (optional - enable it in application_{db_env}.conf)
 * Elastic Search 6
 
 ## Run Mysql/Postgres, Kafka (optional) and Elasticsearch on Docker
@@ -254,4 +254,15 @@ curl -v -X POST localhost:9200/music/_search?size=0 -H 'Content-Type: applicatio
        }
     }
  }'
+ ```
+
+#### Bump version
+
+ ```
+git flow release start {next_version}
+bumpversion minor|major|patch
+git commit -a -m"{next_version}"
+git flow release finish {next_version}
+git push --all
+git push origin --tags
  ```
