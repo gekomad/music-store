@@ -4,7 +4,6 @@ enablePlugins(JavaServerAppPackaging)
 
 name := "music-store"
 
-version := "0.2.2"
 organization := "com.github.gekomad"
 scalaVersion := "2.12.7"
 

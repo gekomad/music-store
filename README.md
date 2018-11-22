@@ -255,3 +255,14 @@ curl -v -X POST localhost:9200/music/_search?size=0 -H 'Content-Type: applicatio
     }
  }'
  ```
+
+#### Bump version
+
+ ```
+git flow release start {next_version}
+bumpversion minor|major|patch
+git commit -a -m"{next_version}"
+git flow release finish {next_version}
+git push --all
+git push origin --tags
+ ```
