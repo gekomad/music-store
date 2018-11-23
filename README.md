@@ -270,6 +270,7 @@ fi
 sed -r -i 's/^version := "(\b[0-9]{1,3}\.){2}[0-9]{1,3}\b"$'/"version := \"$NEXT_VERSION\""/ build.sbt
 
 git commit -a -m "v.$NEXT_VERSION"
+git flow release publish $NEXT_VERSION
 git flow release finish $NEXT_VERSION
 git push --all
 git push origin --tags
