@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 
 if [ "$command" == "" ]
   then
-    printf "${RED}your user must be in docker group${NC}\n"
+    printf "${RED}your user must be in docker group${NC} ${BLUE}(sudo usermod -aG docker $USER)${NC}\n"
     printf "use:\n"
     printf "$0 start\n"
     printf "$0 run n_thread seconds\n"
@@ -123,7 +123,10 @@ run_jmeter()
 
     rm artist_request_url.log  album_request_url.log jmeter.log 2>/dev/null
 
+    echo "jmeter -n -t put_artist.jmx -Jgroup1threads=$n_thread -Jduration=$dur -Jhost=localhost -Jport=$http_port >artist.log ..."
     jmeter -n -t put_artist.jmx -Jgroup1threads=$n_thread -Jduration=$dur -Jhost=localhost -Jport=$http_port >artist.log
+
+    echo "jmeter -n -t put_album.jmx -Jgroup1threads=$n_thread -Jduration=$dur -Jhost=localhost -Jport=$http_port >album.log ..."
     jmeter -n -t put_album.jmx -Jgroup1threads=$n_thread -Jduration=$dur -Jhost=localhost -Jport=$http_port >album.log
 
     echo

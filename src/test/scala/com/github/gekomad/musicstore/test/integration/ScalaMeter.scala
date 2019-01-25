@@ -48,13 +48,11 @@ class ScalaMeter extends FunSuite with BeforeAndAfterAll {
   import org.http4s.syntax._
   import org.http4s.dsl.io._
   import org.http4s.server.blaze._
-  val server =  BlazeServerBuilder[IO]
+  val serverBuilder =  BlazeServerBuilder[IO]
     .bindHttp(Properties.httpPort, Properties.host)
     .withHttpApp(Route.service)
-    .serve
-    .compile
-    .drain
-    .as(ExitCode.Success).unsafeRunAsync(_)
+
+  val fiber = serverBuilder.resource.use(_ => IO.never).start.unsafeRunSync()
 
   override def beforeAll(): Unit = {
 
@@ -68,12 +66,7 @@ class ScalaMeter extends FunSuite with BeforeAndAfterAll {
     assert(s.contains("already exists"))
   }
 
-  override def afterAll(): Unit = {
-    println("shutdown")
-
-
-//    server.shutdown.unsafeRunSync() TODO
-  }
+  override def afterAll(): Unit = fiber.cancel.unsafeRunSync()
 
   test("shutdown") {}
 

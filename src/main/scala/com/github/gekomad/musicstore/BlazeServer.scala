@@ -39,6 +39,4 @@ object BlazeServer extends IOApp  {
     .drain
     .as(ExitCode.Success)
 
-//  override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] = Services.blazeServer.serve
-//  Services.startServices
 }

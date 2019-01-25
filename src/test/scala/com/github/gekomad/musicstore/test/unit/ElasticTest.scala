@@ -56,7 +56,6 @@ class ElasticTest extends FunSuite with BeforeAndAfterAll {
     val index = Properties.elasticSearch.index1
 
     val pp = ElasticService.insert(id, index, product)
-//    val httpClient = Http1Client[IO]().unsafeRunSync
 
     pp.flatMap { r =>
       val read = ElasticService.read(index, Properties.elasticSearch.artistType, id)
