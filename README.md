@@ -5,12 +5,8 @@ Music Store
 
 ## Requisites
 
-* Scala 2.12.7
-* Slick 3.2.3
-* Http4s 0.18.11
-* Circe 0.10.0
-* Mysql/Postgres/Oracle (for Oracle - put ojdbc6.jar in lib directory)
-* Kafka 2.0.0 (optional - enable it in application_{db_env}.conf)
+* Mysql or Postgres or Oracle (for Oracle - put ojdbc6.jar in lib directory)
+* Kafka (optional - enable it in application_{db_env}.conf)
 * Elastic Search 6
 
 ## Run Mysql/Postgres, Kafka (optional) and Elasticsearch on Docker
@@ -22,9 +18,6 @@ Music Store
 #### Configure Mysql
 
     docker exec -i MYSQL-music_store mysql -uroot -pmusic_store  << EOF
-    CREATE USER 'music_store'@'%' IDENTIFIED BY 'music_store';
-    CREATE DATABASE music_store DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;
-    GRANT ALL ON music_store.* TO 'music_store'@'%';
     CREATE USER 'music_store'@'%' IDENTIFIED BY 'music_store';
     CREATE DATABASE music_store DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;
     GRANT ALL ON music_store.* TO 'music_store'@'%';
@@ -256,23 +249,3 @@ curl -v -X POST localhost:9200/music/_search?size=0 -H 'Content-Type: applicatio
  }'
  ```
 
-#### Bump version
-
- ```
-NEXT_VERSION="{next_version}"
-git flow release start $NEXT_VERSION
-bumpversion minor|major|patch
-bumped_version=$(grep current_version .bumpversion.cfg |awk -F "= " '{print $2}')
-if [ "$bumped_version" != "$NEXT_VERSION" ]; then
-    echo "error versions mismatch $bumped_version $NEXT_VERSION"
-    exit 1
-fi
-sed -r -i 's/^version := "(\b[0-9]{1,3}\.){2}[0-9]{1,3}\b"$'/"version := \"$NEXT_VERSION\""/ build.sbt
-
-git commit -a -m "v.$NEXT_VERSION"
-git flow release publish $NEXT_VERSION
-git flow release finish $NEXT_VERSION
-git push --all
-git push origin --tags
-
- ```

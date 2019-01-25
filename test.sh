@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#sudo usermod -aG docker $USER
 docker_image="IT-ELASTIC-music_store"
 docker rm -f $docker_image 2>/dev/null
 echo "start docker image $docker_image..."

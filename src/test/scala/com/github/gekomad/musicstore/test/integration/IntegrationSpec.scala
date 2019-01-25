@@ -27,23 +27,40 @@ import com.github.gekomad.musicstore.{Route, Services}
 import com.github.gekomad.musicstore.test.integration.Common._
 import com.github.gekomad.musicstore.utility.MyRandom._
 import com.github.gekomad.musicstore.utility.Properties
-import cats.effect.IO
+import cats.effect.{ContextShift, ExitCode, IO, Timer}
 import com.github.gekomad.musicstore.model.json.in.AlbumPayload
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
 import com.github.gekomad.musicstore.model.json.out.Artist
 import com.github.gekomad.musicstore.service.ElasticService
 import org.http4s.{dsl, _}
 import org.http4s.client.blaze._
+import org.http4s.server.blaze.BlazeServerBuilder
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 import org.slf4j.{Logger, LoggerFactory}
+
+import scala.concurrent.ExecutionContext.global
 
 class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  private val httpClient = Http1Client[IO]().unsafeRunSync
+  import scala.concurrent.ExecutionContext.global
+  implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  implicit val timer: Timer[IO] = IO.timer(global)
+  import cats.implicits._
+  import org.http4s.HttpRoutes
+  import org.http4s.syntax._
+  import org.http4s.dsl.io._
+  import org.http4s.server.blaze._
 
-  val server = Services.blazeServer.start.unsafeRunSync()
+  val server =    BlazeServerBuilder[IO]
+      .bindHttp(Properties.httpPort, Properties.host)
+      .withHttpApp(Route.service)
+      .serve
+      .compile
+      .drain
+      .as(ExitCode.Success).unsafeRunAsync(_)
+
 
   override def beforeAll(): Unit = {
 
@@ -58,17 +75,20 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
   }
 
   override def afterAll(): Unit = {
-    server.shutdown.unsafeRunSync()
+    println("shutdown")
+//    server.shutdown.unsafeRunSync() TODO
   }
 
   def sendJsonBadRequest(uri: Uri, body: Json) = {
     val s = httpPut(uri, body)
-    httpClient.fetch(s) { x =>
-      x.status match {
-        case Status.BadRequest =>
-          IO(true)
-        case _ =>
-          IO(false)
+    BlazeClientBuilder[IO](global).resource.use { client =>
+      client.fetch(s) { x =>
+        x.status match {
+          case Status.BadRequest =>
+            IO(true)
+          case _ =>
+            IO(false)
+        }
       }
     }
   }
@@ -84,13 +104,15 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       val artistObject = ArtistPayload.random
       val workaround: Json = artistObject.asJson
       val s = httpPut(insertUrl, workaround)
-      val d = httpClient.fetch(s) { x =>
-        x.status match {
-          case Status.Created =>
-            IO(true)
-          case e =>
-            log.error(s"sendJsonNoContent $insertUrl $workaround", e)
-            IO(false)
+      val d = BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(s) { x =>
+          x.status match {
+            case Status.Created =>
+              IO(true)
+            case e =>
+              log.error(s"sendJsonNoContent $insertUrl $workaround", e)
+              IO(false)
+          }
         }
       }
       d.map(assert(_, "insert artist"))
@@ -105,20 +127,23 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       val albumObject = AlbumPayload.random
       val workaround: Json = albumObject.asJson
       val s = httpPut(insertUrl, workaround)
-      val d = httpClient.fetch(s) { x =>
-        x.status match {
-          case Status.Created =>
-            IO(true)
-          case e =>
-            log.error(s"sendJsonNoContent $insertUrl $workaround", e)
-            IO(false)
+      val d = BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(s) { x =>
+          x.status match {
+            case Status.Created =>
+              IO(true)
+            case e =>
+              log.error(s"sendJsonNoContent $insertUrl $workaround", e)
+              IO(false)
+          }
         }
       }
       d.map(assert(_, "insert album"))
     }
 
     log.debug("read artist")
-    val l = httpClient.expect[String](TEST_SERVER_URL.withPath(ARTIST_PATH) / artistId)
+    val l = BlazeClientBuilder[IO](global).resource.use { client =>
+      client.expect[String](TEST_SERVER_URL.withPath(ARTIST_PATH) / artistId)}
 
     l.map { d =>
       val artistList = decode[Artist](d).right.getOrElse(throw new Exception(s"err decode $l"))
@@ -128,17 +153,20 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       log.debug("read album")
 
       val url = TEST_SERVER_URL.withPath(ALBUM_PATH) / albumId
-      val l2 = httpClient.expect[String](url)
+      val l2 = BlazeClientBuilder[IO](global).resource.use { client =>
+        client.expect[String](url)}
       l2.map { ll2 =>
         assert(ll2.contains(albumId), "err")
 
         log.debug("read artist from elastic")
         val o = ElasticService.read(Properties.elasticSearch.index1, Properties.elasticSearch.artistType, artistId.toString)
 
-        httpClient.fetch(o) { x =>
-          x.status match {
-            case Status.Ok => IO(1)
-            case e => throw new Exception(e.toString)
+        BlazeClientBuilder[IO](global).resource.use { client =>
+          client.fetch(o) { x =>
+            x.status match {
+              case Status.Ok => IO(1)
+              case e => throw new Exception(e.toString)
+            }
           }
         }
       }
@@ -149,7 +177,8 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
   test("Get random product") {
     import io.circe.parser.parse
 
-    val doc: IO[String] = httpClient.expect[String](TEST_SERVER_URL withPath RANDOM_ARTIST_PATH)
+    val doc: IO[String] = BlazeClientBuilder[IO](global).resource.use { client =>
+      client.expect[String](TEST_SERVER_URL withPath RANDOM_ARTIST_PATH)}
     doc.map { d =>
       val o = parse(d).getOrElse(throw new Exception)
 
@@ -170,13 +199,15 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       val artistObject = ArtistPayload.random
       val workaround: Json = artistObject.asJson
       val s = httpPut(insertUrl, workaround)
-      val d = httpClient.fetch(s) { x =>
-        x.status match {
-          case Status.Created =>
-            IO(true)
-          case e =>
-            log.error(s"sendJsonNoContent $insertUrl $workaround", e)
-            IO(false)
+      val d = BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(s) { x =>
+          x.status match {
+            case Status.Created =>
+              IO(true)
+            case e =>
+              log.error(s"sendJsonNoContent $insertUrl $workaround", e)
+              IO(false)
+          }
         }
       }
 
@@ -193,13 +224,15 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       val albumObject = AlbumPayload.random.copy(length = 0)
       val workaround: Json = albumObject.asJson
       val s = httpPut(insertUrl, workaround)
-      val d = httpClient.fetch(s) { x =>
-        x.status match {
-          case Status.BadRequest =>
-            IO(true)
-          case e =>
-            log.error(s"sendJsonNoContent $insertUrl $workaround", e)
-            IO(false)
+      val d = BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(s) { x =>
+          x.status match {
+            case Status.BadRequest =>
+              IO(true)
+            case e =>
+              log.error(s"sendJsonNoContent $insertUrl $workaround", e)
+              IO(false)
+          }
         }
       }
 
@@ -218,13 +251,15 @@ class IntegrationSpec extends FunSuite with BeforeAndAfter with BeforeAndAfterAl
       val artistObject = ArtistPayload.random.copy(name = "")
       val workaround: Json = artistObject.asJson
       val s = httpPut(insertUrl, workaround)
-      val d = httpClient.fetch(s) { x =>
-        x.status match {
-          case Status.BadRequest =>
-            IO(true)
-          case e =>
-            log.error(s"sendJsonNoContent $insertUrl $workaround", e)
-            IO(false)
+      val d = BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(s) { x =>
+          x.status match {
+            case Status.BadRequest =>
+              IO(true)
+            case e =>
+              log.error(s"sendJsonNoContent $insertUrl $workaround", e)
+              IO(false)
+          }
         }
       }
       d.map(assert(_, "insert wrong name returns BadRequest"))

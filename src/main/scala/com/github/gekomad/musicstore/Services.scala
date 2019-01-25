@@ -28,7 +28,7 @@ import com.github.gekomad.musicstore.utility.Properties
 object Services {
   val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def blazeServer = BlazeBuilder[IO].bindHttp(Properties.httpPort, Properties.host).mountService(Route.service, "/")
+//  def blazeServer = BlazeBuilder[IO].bindHttp(Properties.httpPort, Properties.host).mountService(Route.service, "/")
 
   def startServices() = {
     Properties.kafka.fold(log.info("Kafka is disabled")) { kafkaConf =>

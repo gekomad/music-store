@@ -1,5 +1,3 @@
-import sbt.Keys.libraryDependencies
-
 enablePlugins(JavaServerAppPackaging)
 
 name := "music-store"
@@ -7,7 +5,7 @@ name := "music-store"
 version := "1.0.0"
 
 organization := "com.github.gekomad"
-scalaVersion := "2.12.7"
+scalaVersion := "2.12.8"
 
 scalacOptions := Seq(
   "-deprecation",
@@ -20,7 +18,7 @@ scalacOptions := Seq(
 )
 
 
-val http4sVersion = "0.18.11"
+val http4sVersion = "0.19.0"
 val circeVersion = "0.10.0"
 val slickVersion = "3.2.3"
 val kafkaVersion = "1.0.0"
@@ -32,7 +30,7 @@ val scalaTestVersion = "3.0.5"
 val scalaCheckVersion = "1.14.0"
 val scalaMeterVersion = "0.10.1"
 val postgresVersion = "42.2.5"
-val mysqlVersion = "8.0.12"
+val mysqlVersion = "8.0.14"
 
 //http4s
 libraryDependencies += "org.http4s" %% "http4s-blaze-server" % http4sVersion

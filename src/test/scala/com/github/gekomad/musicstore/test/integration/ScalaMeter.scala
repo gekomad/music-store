@@ -29,19 +29,32 @@ import org.scalameter.{Key, Warmer, config}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.slf4j.{Logger, LoggerFactory}
 import java.util.concurrent._
-import cats.effect.IO
+
+import cats.effect.{ContextShift, ExitCode, IO, Timer}
 import ch.qos.logback.classic.Level
 import com.github.gekomad.musicstore.model.json.in.ProductBase.ArtistPayload
 import com.github.gekomad.musicstore.utility.Net.httpPut
 import Net.defaultHeader
+import org.http4s.server.blaze.BlazeServerBuilder
 
 class ScalaMeter extends FunSuite with BeforeAndAfterAll {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-
-  private val httpClient = Http1Client[IO]().unsafeRunSync
-
-  val server = Services.blazeServer.start.unsafeRunSync()
+  import scala.concurrent.ExecutionContext.global
+  implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  implicit val timer: Timer[IO] = IO.timer(global)
+  import cats.implicits._
+  import org.http4s.HttpRoutes
+  import org.http4s.syntax._
+  import org.http4s.dsl.io._
+  import org.http4s.server.blaze._
+  val server =  BlazeServerBuilder[IO]
+    .bindHttp(Properties.httpPort, Properties.host)
+    .withHttpApp(Route.service)
+    .serve
+    .compile
+    .drain
+    .as(ExitCode.Success).unsafeRunAsync(_)
 
   override def beforeAll(): Unit = {
 
@@ -56,7 +69,10 @@ class ScalaMeter extends FunSuite with BeforeAndAfterAll {
   }
 
   override def afterAll(): Unit = {
-    server.shutdown.unsafeRunSync()
+    println("shutdown")
+
+
+//    server.shutdown.unsafeRunSync() TODO
   }
 
   test("shutdown") {}
@@ -71,17 +87,20 @@ class ScalaMeter extends FunSuite with BeforeAndAfterAll {
       val uuid = getRandomUUID.toString
       val insertUrl: Uri = TEST_SERVER_URL.withPath(ARTIST_PATH) / uuid
 
-      val wr = httpClient.fetch(httpPut(insertUrl, json)) { x =>
-        x.status match {
-          case Status.Created =>
+      val wr = BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(httpPut(insertUrl, json)) { x =>
+          x.status match {
+            case Status.Created =>
 
-            val get = httpClient.expect[String](TEST_SERVER_URL.withPath(ARTIST_PATH) / uuid)
+              val get = BlazeClientBuilder[IO](global).resource.use { client =>
+                client.expect[String](TEST_SERVER_URL.withPath(ARTIST_PATH) / uuid)}
 
-            IO(get.map(_.contains(uuid.toString)))
+              IO(get.map(_.contains(uuid.toString)))
 
-          case e =>
-            log.error(s"sendJsonNoContent $insertUrl $json", e)
-            fail()
+            case e =>
+              log.error(s"sendJsonNoContent $insertUrl $json", e)
+              fail()
+          }
         }
       }.unsafeRunSync().unsafeRunSync()
       assert(wr)

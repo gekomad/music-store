@@ -23,11 +23,8 @@ import java.time.format.DateTimeFormatter
 import com.github.gekomad.musicstore.utility.MyPredef._
 import com.github.gekomad.musicstore.utility.Utility._
 import org.scalatest._
-import org.slf4j.{Logger, LoggerFactory}
 
 class UtilTest extends FunSuite {
-
-  val log: Logger = LoggerFactory.getLogger(this.getClass)
 
   test("Check Domain") {
     assert(!isDomain("ssss"))

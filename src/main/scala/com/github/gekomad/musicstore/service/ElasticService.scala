@@ -28,18 +28,25 @@ import io.circe._
 import io.circe.syntax._
 import org.http4s.{Request, Status, Uri}
 import org.slf4j.{Logger, LoggerFactory}
-import cats.effect.IO
-import org.http4s.client.Client
-import org.http4s.client.blaze._
+import cats.effect.{ContextShift, IO, Timer}
 
+import scala.concurrent.ExecutionContext
+import java.util.concurrent._
+
+import org.http4s.client.blaze._
+import org.http4s.client._
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.immutable
 
 object ElasticService {
 
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
-  private val httpClient: Client[IO] = Http1Client[IO]().unsafeRunSync
 
+  import scala.concurrent.ExecutionContext.global
+  implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  implicit val timer: Timer[IO] = IO.timer(global)
   private val artistType: String = Properties.elasticSearch.artistType
   private val albumType: String = Properties.elasticSearch.albumType
 
@@ -47,7 +54,7 @@ object ElasticService {
 
   def byId(index: String, theType: String, id: String): Uri = Properties.elasticSearch.host.withPath(s"""/$index/$theType/$id""")
 
-  def albumsAvgDuration(artistId: String)(index: String = Properties.elasticSearch.index1) = {
+  def albumsAvgDuration(artistId: String)(index: String = Properties.elasticSearch.index1): IO[Double] = {
     val query =
       s""" {
       "query":{
@@ -71,60 +78,63 @@ object ElasticService {
 
     val s: IO[Request[IO]] = httpPost(uri, queryJson)
 
-    httpClient.fetch(s) {
-      x =>
-        x.status match {
-          case Status.Ok =>
-            body(x).map { ss =>
-              val o = parse(ss).getOrElse(Json.Null)
-              val p1 = o.as[Aggregations1]
-              val p = p1.map { a =>
-                a.aggregations.avg_rating.value
+    BlazeClientBuilder[IO](global).resource.use { client =>
+      client.fetch(s) {
+        x =>
+          x.status match {
+            case Status.Ok =>
+              body(x).map { ss =>
+                val o = parse(ss).getOrElse(Json.Null)
+                val p1 = o.as[Aggregations1]
+                val p = p1.map { a =>
+                  a.aggregations.avg_rating.value
+                }
+                val o1 = p.getOrElse(throw new Exception(s"err decode $p"))
+                o1
               }
-              val o1= p.getOrElse(throw new Exception(s"err decode $p"))
-              o1
-            }
-          case e =>
-            log.error(s"err $e")
-            IO.raiseError(new Exception(e.toString))
-        }
+            case e =>
+              log.error(s"err $e")
+              IO.raiseError(new Exception(e.toString))
+          }
+      }
     }
-
   }
 
-  def searchArtistByName(name: String)(index: String = Properties.elasticSearch.index1) = {
+  def searchArtistByName(name: String)(index: String = Properties.elasticSearch.index1): IO[List[ElasticArtist]] = {
     val uri = Properties.elasticSearch.host.withPath(s"""/$index/$artistType/_search?q=name:$name""")
 
-    httpClient.expect[String](uri).map { a =>
-      val o = parse(a).getOrElse(Json.Null)
+    BlazeClientBuilder[IO](global).resource.use { client =>
+      client.expect[String](uri).map { a =>
+        val o = parse(a).getOrElse(Json.Null)
 
-      val p1 = o.as[ElasticSearchTemplate[ElasticArtist]]
-      val p = p1.map { a =>
-        a.hits.hits.map { z =>
-          z._source
+        val p1 = o.as[ElasticSearchTemplate[ElasticArtist]]
+        val p = p1.map { a =>
+          a.hits.hits.map { z =>
+            z._source
+          }
         }
+        p.getOrElse(throw new Exception(s"err decode $p"))
       }
-      p.getOrElse(throw new Exception(s"err decode $p"))
     }
-
   }
 
-  def searchTrack(name: String)(implicit index: String = Properties.elasticSearch.index1) = {
+  def searchTrack(name: String)(implicit index: String = Properties.elasticSearch.index1): IO[List[(String, ElasticAlbum)]] = {
 
     val uri = Properties.elasticSearch.host.withPath(s"""/$index/$albumType/_search?q=tracks:$name""")
 
-    httpClient.expect[String](uri).map { a =>
-      val o = parse(a).getOrElse(Json.Null)
+    BlazeClientBuilder[IO](global).resource.use { client =>
+      client.expect[String](uri).map { a =>
+        val o = parse(a).getOrElse(Json.Null)
 
-      val p1 = o.as[ElasticSearchTemplate[ElasticAlbum]]
-      val p = p1.map { a =>
-        a.hits.hits.map { z =>
-          (z._id, z._source)
+        val p1 = o.as[ElasticSearchTemplate[ElasticAlbum]]
+        val p = p1.map { a =>
+          a.hits.hits.map { z =>
+            (z._id, z._source)
+          }
         }
+        p.getOrElse(throw new Exception("err decode"))
       }
-      p.getOrElse(throw new Exception("err decode"))
     }
-
   }
 
   def insert[A <: ElasticProductBase](id: String, index: String, product: A): IO[String] = {
@@ -135,15 +145,17 @@ object ElasticService {
       log.debug(s"putElastic: $uriPut $json")
       val s = httpPut(uriPut, json)
 
-      httpClient.fetch(s) {
-        x =>
-          x.status match {
-            case Status.Ok | Status.Created =>
-              body(x)
-            case e =>
-              log.error(s"putElastic artist err $uriPut $e")
-              IO.raiseError(new Exception(e.toString))
-          }
+      BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(s) {
+          x =>
+            x.status match {
+              case Status.Ok | Status.Created =>
+                body(x)
+              case e =>
+                log.error(s"putElastic artist err $uriPut $e")
+                IO.raiseError(new Exception(e.toString))
+            }
+        }
       }
     }
 
@@ -151,15 +163,17 @@ object ElasticService {
       val uriPut = routing(index, albumType, id, artistId)
       log.debug(s"putElastic: $uriPut $json")
 
-      httpClient.fetch(httpPut(uriPut, json)) {
-        x =>
-          x.status match {
-            case Status.Ok | Status.Created =>
-              body(x)
-            case e =>
-              log.error(s"err $uriPut $e")
-              IO.raiseError(new Exception(e.toString))
-          }
+      BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(httpPut(uriPut, json)) {
+          x =>
+            x.status match {
+              case Status.Ok | Status.Created =>
+                body(x)
+              case e =>
+                log.error(s"err $uriPut $e")
+                IO.raiseError(new Exception(e.toString))
+            }
+        }
       }
     }
 
@@ -178,7 +192,7 @@ object ElasticService {
 
   def read(index: String, theType: String, id: String) = httpGet(byId(index, theType, id))
 
-  def albumsByArtist(index: String, id: String) = {
+  def albumsByArtist(index: String, id: String): IO[immutable.Seq[String]] = {
     val query =
       s""" {
       "query": {
@@ -196,28 +210,30 @@ object ElasticService {
 
     val s: IO[Request[IO]] = httpPost(uri, queryJson)
 
-    httpClient.fetch(s) {
-      x =>
-        x.status match {
-          case Status.Ok =>
-            val a = body(x)
-            val ps = a.map { ss =>
-              val o = parse(ss).getOrElse(Json.Null)
+    BlazeClientBuilder[IO](global).resource.use { client =>
+      client.fetch(s) {
+        x =>
+          x.status match {
+            case Status.Ok =>
+              val a = body(x)
+              val ps = a.map { ss =>
+                val o = parse(ss).getOrElse(Json.Null)
 
-              val p1 = o.as[ElasticSearchTemplate[ElasticProductBase]]
-              val p = p1.map { a =>
-                a.hits.hits.map { z =>
-                  z._id
+                val p1 = o.as[ElasticSearchTemplate[ElasticProductBase]]
+                val p = p1.map { a =>
+                  a.hits.hits.map { z =>
+                    z._id
+                  }
                 }
+                val ps: immutable.Seq[String] = p.getOrElse(throw new Exception(s"err decode $p"))
+                ps
               }
-              val ps: immutable.Seq[String] = p.getOrElse(throw new Exception(s"err decode $p"))
               ps
-            }
-            ps
-          case e =>
-            log.error(s"err $e")
-            IO.raiseError(new Exception(e.toString))
-        }
+            case e =>
+              log.error(s"err $e")
+              IO.raiseError(new Exception(e.toString))
+          }
+      }
     }
 
   }
@@ -234,13 +250,15 @@ object ElasticService {
 
       val dd = httpDelete(uriArtist)
 
-      httpClient.fetch(dd) { x =>
-        x.status match {
-          case Status.Ok =>
-            body(x)
-          case e =>
-            log.error(s"err $e")
-            IO.raiseError(new Exception(e.toString))
+      BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(dd) { x =>
+          x.status match {
+            case Status.Ok =>
+              body(x)
+            case e =>
+              log.error(s"err $e")
+              IO.raiseError(new Exception(e.toString))
+          }
         }
       }
     }
@@ -254,18 +272,20 @@ object ElasticService {
     log.debug(uri.toString())
     val dd = httpDelete(uri)
 
-    httpClient.fetch(dd) { x =>
-      x.status match {
-        case Status.Ok =>
-          body(x)
-        case e =>
-          log.error(s"err $e")
-          IO.raiseError(new Exception(e.toString))
+    BlazeClientBuilder[IO](global).resource.use { client =>
+      client.fetch(dd) { x =>
+        x.status match {
+          case Status.Ok =>
+            body(x)
+          case e =>
+            log.error(s"err $e")
+            IO.raiseError(new Exception(e.toString))
+        }
       }
     }
   }
 
-  def createSchema = {
+  def createSchema: IO[String] = {
     val uri = Properties.elasticSearch.host.withPath("/music")
     val b =
       """
@@ -288,17 +308,19 @@ object ElasticService {
     val json: Json = parse(b).getOrElse(Json.Null)
 
     val s = httpPut(uri, json)
-    httpClient.fetch(s) {
-      x =>
-        x.status match {
-          case Status.Ok =>
-            body(x)
-          case Status.Created =>
-            body(x)
-          case e =>
-            log.error(s"err $uri $e")
-            IO.raiseError(new Exception(body(x) + e.toString()))
-        }
+    BlazeClientBuilder[IO](global).resource.use { client =>
+      client.fetch(s) {
+        x =>
+          x.status match {
+            case Status.Ok =>
+              body(x)
+            case Status.Created =>
+              body(x)
+            case e =>
+              log.error(s"err $uri $e")
+              IO.raiseError(new Exception(body(x) + e.toString()))
+          }
+      }
     }
   }
 

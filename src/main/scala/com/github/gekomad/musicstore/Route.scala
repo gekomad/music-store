@@ -16,7 +16,6 @@
 */
 
 package com.github.gekomad.musicstore
-
 import io.circe.syntax._
 import io.circe.generic.auto._
 import io.circe.java8.time._
@@ -44,6 +43,7 @@ import scala.util.{Failure, Success, Try}
 object Route {
 
   val log: Logger = LoggerFactory.getLogger(this.getClass)
+
 
   def removeNull(x: Json): String = x.pretty(Printer.spaces2.copy(dropNullValues = true))
 
@@ -112,7 +112,7 @@ object Route {
     p
   }
 
-  val service: HttpService[IO] = HttpService[IO] {
+  val service = HttpRoutes.of[IO] {
 
     case GET -> Root / "rest" / "create_sql_schema" =>
       log.debug(s"received create_sql_schema")
@@ -243,6 +243,6 @@ object Route {
         }
       IO.fromFuture(IO(tr1)).flatMap(g => g)
 
-  }
+  }.orNotFound
 
 }

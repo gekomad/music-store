@@ -17,23 +17,25 @@
 
 package com.github.gekomad.musicstore.test.unit
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
 import com.github.gekomad.musicstore.model.json.elasticsearch.Products.ElasticArtist
 import com.github.gekomad.musicstore.service.ElasticService
 import com.github.gekomad.musicstore.utility.{MyRandom, Properties}
 import io.circe.java8.time._
 import org.http4s._
-import org.http4s.client.blaze.Http1Client
+import org.http4s.client.blaze.BlazeClientBuilder
 import org.scalatest._
-import org.slf4j.{Logger, LoggerFactory}
+
 import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.global
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Try}
 
 class ElasticTest extends FunSuite with BeforeAndAfterAll {
 
-  val log: Logger = LoggerFactory.getLogger(this.getClass)
-
+  import scala.concurrent.ExecutionContext.global
+  implicit val cs: ContextShift[IO] = IO.contextShift(global)
+  implicit val timer: Timer[IO] = IO.timer(global)
 
   override def beforeAll(): Unit = {
     if (!Properties.elasticSearch.check)
@@ -54,22 +56,22 @@ class ElasticTest extends FunSuite with BeforeAndAfterAll {
     val index = Properties.elasticSearch.index1
 
     val pp = ElasticService.insert(id, index, product)
-    val httpClient = Http1Client[IO]().unsafeRunSync
+//    val httpClient = Http1Client[IO]().unsafeRunSync
 
     pp.flatMap { r =>
       val read = ElasticService.read(index, Properties.elasticSearch.artistType, id)
-      httpClient.fetch(read) {
-        x =>
-          x.status match {
-            case Status.Ok =>
-              IO(1)
-            case e =>
-              fail(e.toString)
-              IO(1)
-          }
+      BlazeClientBuilder[IO](global).resource.use { client =>
+        client.fetch(read) {
+          x =>
+            x.status match {
+              case Status.Ok =>
+                IO(1)
+              case e =>
+                fail(e.toString)
+                IO(1)
+            }
+        }
       }
-
     }
-
   }
 }
